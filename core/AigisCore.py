@@ -16,7 +16,6 @@ class Aigis():
     def __init__(self, config):
         # Load the config
         self.config = toml.load(config)
-        print(self.config)
 
         # Launch the logging service
 
