@@ -2,13 +2,14 @@
 Representation of a plugin with handlers used by the core to properly route traffic.
 """
 
-
 class AigisPlugin():
     """
     A plugin that can be managed by AIGIS and it's core.
     """
     def __init__(self):
         self.id = id(self)
+        self.name = None
+        self.type = None
 
     def __eq__(self, other):
         """
