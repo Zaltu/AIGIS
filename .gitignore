@@ -1,3 +1,6 @@
 # Ignore compiled python
 __pycache__/
 *.pyc
+
+# Ignore logging folder
+log/
