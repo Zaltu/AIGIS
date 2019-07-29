@@ -1,10 +1,11 @@
 """
 Helper module to hold and organize loaded plugins.
 """
+from utils.AigisLog import LOG  #pylint: disable=no-name-in-module
 
 class PluginManager(list):
     """
-    Helper clas to hold and organize loaded plugins.
+    Helper class to hold and organize loaded plugins.
     """
     core = []
     external = []
@@ -38,9 +39,18 @@ class PluginManager(list):
         """
         if plugin in self:
             self.dead.append(self.pop(self.index(plugin)))
+            plugin.cleanup()
 
-        if plugin in self.core:
-            self.core.remove(plugin)
+            if plugin in self.core:
+                self.core.remove(plugin)
 
-        if plugin in self.external:
-            self.external.remove(plugin)
+            if plugin in self.external:
+                self.external.remove(plugin)
+
+    def cleanup(self):
+        """
+        Request all plugins clean themselves up.
+        """
+        LOG.shutdown("Requesting plugins clean themselves up.")
+        for plugin in self:
+            plugin.cleanup()
