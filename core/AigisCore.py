@@ -41,12 +41,6 @@ class Aigis():
         self.log_manager.cleanup()
 
 
-
-
-
-
-
 # Aigis needs to
-# - prep and start the log service
 # - call the plugin loader
 # - ???
