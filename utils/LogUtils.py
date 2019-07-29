@@ -39,6 +39,10 @@ if not os.path.exists(os.path.abspath(os.path.join(os.path.dirname(__file__), ".
     os.mkdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "../log")))
 
 
+LOG = logging.getLogger("AIGIS")
+_add_log_handlers(LOG, os.path.join(os.path.dirname(__file__), "../log/core.log"))
+
+
 def _plugin_file_name(plugin):
     """
     Fetch the filename of a plugin's log file.
