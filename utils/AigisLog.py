@@ -61,6 +61,14 @@ class LogManager():
         self.loggers[plugin.id] = logger
         return logger
 
+    def cleanup(self):
+        """
+        Clean up all loggers registered in the LogManager
+        """
+        LOG.shutdown("Cleaning up registered loggers...")
+        for logger in self.loggers:
+            logger.cleanup()
+
 
 class AigisLogger():
     """
