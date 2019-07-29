@@ -26,3 +26,9 @@ class AigisPlugin():
         except AttributeError:
             pass
         return False
+
+    def cleanup(self):
+        """
+        Container function to handle cleaning up any resources used by the plugin.
+        By default does nothing. Should be overwritten if cleanup is required.
+        """
