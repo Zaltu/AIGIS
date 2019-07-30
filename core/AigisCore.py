@@ -5,8 +5,8 @@ import atexit
 import toml
 
 from plugins.PluginManager import PluginManager
-from utils.LogManager import LogManager  #pylint: disable=no-name-in-module
-from utils.LogUtils import LOG  #pylint: disable=no-name-in-module
+from diary.LogManager import LogManager
+from diary.LogUtils import LOG
 
 class Aigis():
     """

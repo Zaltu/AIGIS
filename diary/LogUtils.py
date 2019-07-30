@@ -6,6 +6,35 @@ import sys
 import logging
 
 
+def _plugin_file_name(plugin):
+    """
+    Fetch the filename of a plugin's log file.
+
+    :param AigisPlugin plugin: an AigisPlugin
+
+    :returns: absolute log file path
+    :rtype: str
+    """
+    return os.path.abspath(os.path.join(PLUGIN_LOG_LOCATION, "_".join([plugin.name, plugin.id])))
+
+
+def _add_log_handlers(logger, logfile):
+    """
+    Add the file and stream handlers to a logger.
+
+    :param logging.logger logger: the logger to configure
+    :param str logfile: file to log to disk
+    """
+    if not os.path.exists(logfile):
+        with open(logfile, 'w+'):
+            pass
+    logger.setLevel(logging.INFO)
+    fh = logging.FileHandler(logfile)
+    fh.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
+    logger.addHandler(fh)
+    logger.addHandler(_SH)
+
+
 ### Define extra custom logging levels.
 ### Mostly used for fluff, but potentially usefull also for log tracking and management.
 ### We define BOOT and SHUTDOWN here.
@@ -41,31 +70,3 @@ if not os.path.exists(os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 
 LOG = logging.getLogger("AIGIS")
 _add_log_handlers(LOG, os.path.join(os.path.dirname(__file__), "../log/core.log"))
-
-
-def _plugin_file_name(plugin):
-    """
-    Fetch the filename of a plugin's log file.
-
-    :param AigisPlugin plugin: an AigisPlugin
-
-    :returns: absolute log file path
-    :rtype: str
-    """
-    return os.path.abspath(os.path.join(PLUGIN_LOG_LOCATION, "_".join([plugin.name, plugin.id])))
-
-def _add_log_handlers(logger, logfile):
-    """
-    Add the file and stream handlers to a logger.
-
-    :param logging.logger logger: the logger to configure
-    :param str logfile: file to log to disk
-    """
-    if not os.path.exists(logfile):
-        with open(logfile, 'w+'):
-            pass
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(logfile)
-    fh.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
-    logger.addHandler(fh)
-    logger.addHandler(_SH)

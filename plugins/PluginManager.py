@@ -1,7 +1,7 @@
 """
 Helper module to hold and organize loaded plugins.
 """
-from utils.AigisLog import LOG  #pylint: disable=no-name-in-module
+from diary.AigisLog import LOG  #pylint: disable=no-name-in-module
 
 class PluginManager(list):
     """
