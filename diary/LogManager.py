@@ -2,8 +2,8 @@
 Module for the Log Management class
 """
 import logging
-from diary.AigisLog import AigisLogger  #pylint: disable=no-name-in-module
-from diary.LogUtils import _add_log_handlers, CORE_LOG_LOCATION, LOG  #pylint: disable=no-name-in-module
+from diary.AigisLog import AigisLogger
+from diary.LogUtils import _add_log_handlers, CORE_LOG_LOCATION, LOG
 
 class LogManager():
     """
