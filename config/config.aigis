@@ -2,5 +2,5 @@
 # Pick and choose
 
 [plugins]
-"madbot" = "https://github.com/zaltu/mad-bot/"  # TODO
-# local-name = github-source | local path
+"madbot" = "https://github.com/zaltu/mad-bot.git"  # TODO
+# local-name = github-source
