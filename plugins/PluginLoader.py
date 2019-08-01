@@ -3,8 +3,8 @@ Process AIGIS plugin.
 """
 import os
 import shutil
-import traceback
 import subprocess
+from diary.AigisLog import LOG
 
 def load(config, plugin):
     """
@@ -14,10 +14,16 @@ def load(config, plugin):
 
     :param module config: the config module for this plugin
     :param AigisPlugin plugin: the plugin stored in core, regardless of plugin type.
+
+    :raises RequirementError: if there is an Exception while processing the plugin's requirements.
     """
     contextualize(config, plugin)
-    requirements(config)
-    run(config)
+    try:
+        requirements(config)
+    except RequirementError as e:
+        LOG.error(str(e))
+        raise
+    #run(config)
 
 
 def contextualize(config, plugin):
@@ -30,6 +36,8 @@ def contextualize(config, plugin):
     """
     if 'external' in config.PLUGIN_TYPE:
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
+        config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
+        config.LAUNCH = config.LAUNCH.format(root=plugin.root)
 
 
 def requirements(config):
@@ -47,16 +55,15 @@ def requirements(config):
         except AssertionError:
             raise RequirementError("Fatal error. Host has no %s installed." % req)
 
-    for req in config.REQUIREMENT_LIST:
-        try:
-            os.system(" ".join([config.REQUIREMENT_COMMAND, req]))
-        except Exception as e:
-            tb_lines = traceback.format_exception(e.__class__, e, e.__traceback__)
-            tb_text = ''.join(tb_lines)
-            raise RequirementError(
-                "Could not process requirements %s. The following error occured:\n%s" %
-                (req, tb_text)
-            )
+    try:
+        output = os.system(" ".join([config.REQUIREMENT_COMMAND, config.REQUIREMENT_FILE]))
+        if output != 0:
+            raise RequirementError("Requirement install exited with error code %s" % output)
+    except Exception as e:
+        raise RequirementError(
+            "Could not process requirements %s. The following error occured:\n%s" %
+            (config.REQUIREMENT_FILE, str(e))
+        )
 
 def run(config):
     """

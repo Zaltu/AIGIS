@@ -5,11 +5,16 @@ Representation of a plugin with handlers used by the core to properly route traf
 class AigisPlugin():
     """
     A plugin that can be managed by AIGIS and it's core.
+
+    :param str name: name of the plugin
+    :param str root: root path of the plugin
+    :param str ptype: the plugin type
     """
-    def __init__(self):
+    def __init__(self, name, root, ptype):
         self.id = id(self)
-        self.name = None
-        self.type = None
+        self.name = name
+        self.root = root
+        self.type = ptype
 
     def __eq__(self, other):
         """
