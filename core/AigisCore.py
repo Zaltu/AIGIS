@@ -46,5 +46,4 @@ class Aigis():
 
 
 # Aigis needs to
-# - call the plugin loader
 # - ???
