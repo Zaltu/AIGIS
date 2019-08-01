@@ -4,3 +4,6 @@ __pycache__/
 
 # Ignore logging folder
 log/
+
+# Ignore downloaded extensions
+ext/
