@@ -33,6 +33,9 @@ class Aigis():
         LOG.boot("Launching plugin manager")
         self.plugins = PluginManager()
 
+        # Load the plugins
+        self.plugins.load_all(self.config["plugins"])
+
     def cleanup(self):
         """
         Dribble down the cleanup request to Aigis' components.
