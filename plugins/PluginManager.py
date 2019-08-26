@@ -4,9 +4,11 @@ Helper module to hold and organize loaded plugins.
 import os
 import importlib.util
 import subprocess
+import traceback
 
 import pygit2
 
+from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
 from plugins import PluginLoader
 from diary.AigisLog import LOG
@@ -21,14 +23,15 @@ class PluginManager(list):
     external = []
     dead = []
     def __init__(self):
-        list.__init__(self)
-        _ensure_path_exists(PLUGIN_ROOT_PATH)
+        super().__init__(self)
+        ensure_path_exists(PLUGIN_ROOT_PATH)
 
-    def load_all(self, config):
+    def load_all(self, config, log_manager):
         """
         Download the plugins specified in the config
 
         :param dict config: the loaded plugins section of the config
+        :param LogManager log_manager: the log manager for this AIGIS instance
         """
         LOG.boot("Downloading configured plugins...")
         for plugin in config:
@@ -46,9 +49,9 @@ class PluginManager(list):
 
             LOG.boot("Prepping and launching %s", plugin)
             try:
-                self.append(self._aigisplugin_load_wrapper(plugin, plugin_path, plugin_config))
+                self.append(self._aigisplugin_load_wrapper(plugin, plugin_path, plugin_config, log_manager))
             except:  #pylint: disable=bare-except
-                LOG.error("Could not load plugin %s!", plugin)
+                LOG.error("Could not load plugin %s!\n%s", plugin, traceback.format_exc(limit=3))
 
     def add_to_core(self, plugin):
         """
@@ -84,6 +87,9 @@ class PluginManager(list):
             if plugin in self.external:
                 self.external.remove(plugin)
 
+        plugin.log.SHUTDOWN("Plugin buried.")
+        LOG.warning("%s has terminated.", plugin.name)
+
     def cleanup(self):
         """
         Request all plugins clean themselves up.
@@ -92,22 +98,23 @@ class PluginManager(list):
         for plugin in self:
             plugin.cleanup()
 
-    def _aigisplugin_load_wrapper(self, plugin_name, plugin_path, plugin_config):
+    def _aigisplugin_load_wrapper(self, plugin_name, plugin_path, plugin_config, log_manager):
         """
         Wrapper around AigisPlugin instantiation to avoid python object reference issues.
 
         :param str plugin_name: plugin name
         :param str plugin_path: path to plugin
         :param str plugin_config: plugin config module
+        :param LogManager log_manager: the log manager for this AIGIS instance
 
         :returns: plugin object
         :rtype: AigisPlugin
 
         :raises RequirementError: if there is an Exception while processing the plugin's requirements.
         """
-        plugin = AigisPlugin(plugin_name, plugin_path, plugin_config.PLUGIN_TYPE)
+        plugin = AigisPlugin(plugin_name, plugin_path, plugin_config.PLUGIN_TYPE, log_manager)
         try:
-            PluginLoader.load(plugin_config, plugin)
+            PluginLoader.load(plugin_config, plugin, self)
         except PluginLoader.RequirementError:
             self.dead.append(plugin)
             raise
@@ -126,7 +133,7 @@ def download_plugin(plugin_name, github_path, plugin_path):
     :returns: if instruction was successful
     :rtype: bool
     """
-    if _ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin_name)):
+    if ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin_name)):
         try:
             LOG.info("%s already installed, making sure it's up to date...", plugin_name)
             subprocess.check_output(["git", "pull"], cwd=plugin_path)
@@ -169,20 +176,3 @@ def _plugin_config_generator(plugin_name, config_path):
         LOG.error("Plugin %s has no AigisBot configuration file at %s", plugin_name, config_path)
         return None
     return plugin_config
-
-
-def _ensure_path_exists(path):
-    """
-    If provided path does not exist, create it.
-
-    :param str path: path to validate
-
-    :returns: if path existed
-    :rtype: bool
-    """
-    # Ensure that the plugin download path exists
-    if not os.path.exists(path):
-        LOG.info("Creating path %s", path)
-        os.mkdir(path)
-        return False
-    return True

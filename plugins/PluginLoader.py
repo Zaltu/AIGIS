@@ -3,10 +3,14 @@ Process AIGIS plugin.
 """
 import os
 import shutil
-import subprocess
+import asyncio
 from diary.AigisLog import LOG
+from plugins.WatchDog import jiii
 
-def load(config, plugin):
+# Get asyncio event loop for subprocess management
+ALOOP = asyncio.get_event_loop()
+
+def load(config, plugin, manager):
     """
     Set up the AIGIS plugin. This means executing the two major steps.
     REQUIREMENTS
@@ -14,16 +18,18 @@ def load(config, plugin):
 
     :param module config: the config module for this plugin
     :param AigisPlugin plugin: the plugin stored in core, regardless of plugin type.
+    :param PluginManager manager: this instance's PluginManager
 
     :raises RequirementError: if there is an Exception while processing the plugin's requirements.
     """
     contextualize(config, plugin)
     try:
-        requirements(config)
+        requirements(config, plugin)
     except RequirementError as e:
         LOG.error(str(e))
         raise
-    #run(config)
+    plugin.log.boot("Ready for deployment...")
+    #run(config, plugin, manager)
 
 
 def contextualize(config, plugin):
@@ -32,7 +38,7 @@ def contextualize(config, plugin):
     depending on numerous factors.
 
     :param module config: this plugin's config
-    :param AigisPlugin plugin: the core plugin object
+    :param AigisPlugin plugin: the plugin stored in core
     """
     if 'external' in config.PLUGIN_TYPE:
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
@@ -40,11 +46,12 @@ def contextualize(config, plugin):
         config.LAUNCH = config.LAUNCH.format(root=plugin.root)
 
 
-def requirements(config):
+def requirements(config, plugin):
     """
     Install the requirements for this plugin on the host system, based on the plugin config.
 
     :param module config: config module for this plugin
+    :param AigisPlugin plugin: the plugin stored in core
 
     :raises RequirementError: if requirements are not or cannot be met.
     """
@@ -65,16 +72,31 @@ def requirements(config):
             (config.REQUIREMENT_FILE, str(e))
         )
 
-def run(config):
+    plugin.log.boot("Requirements processed successfully...")
+
+
+def run(config, plugin, manager):
     """
     This function launches the plugin following different logic depending on the plugin type
     specified in the config.
 
     :param module config: config module for this plugin
+    :param AigisPlugin plugin: plugin to be passed to the WatchDog for external processes
+    :param PluginManager manager: this instance's PluginManager to be passed to the WatchDog
+    for external processes
     """
-    if config.PLUGIN_TYPE == "external":
-        subprocess.Popen(config.LAUNCH, cwd=config.ENTRYPOINT)
+    if config.PLUGIN_TYPE in ["external", "external-pipe"]:
+        ALOOP.run_until_complete(_run_async_subprocess(config, plugin, manager))
 
+    plugin.log.boot("Running...")
+
+
+async def _run_async_subprocess(config, plugin, manager):
+    """
+    Launch an asyncio subprocess and request scheduling for the watchdog task.
+    """
+    proc = await asyncio.create_subprocess_exec(config.LAUNCH, cwd=config.ENTRYPOINT)
+    ALOOP.ensure_future(jiii(proc, plugin, manager))
 
 
 class RequirementError(Exception):
