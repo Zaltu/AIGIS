@@ -4,8 +4,12 @@ Process AIGIS plugin.
 import os
 import shutil
 import asyncio
-from diary.AigisLog import LOG
+from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
 from plugins.WatchDog import jiii
+
+# Set the dump location for plugin secrets
+SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
+ensure_path_exists(SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
@@ -21,12 +25,18 @@ def load(config, plugin, manager):
     :param PluginManager manager: this instance's PluginManager
 
     :raises RequirementError: if there is an Exception while processing the plugin's requirements.
+    :raises MissingSecretFileError: if one of the plugin's specified secrets files cannot be found.
     """
     contextualize(config, plugin)
     try:
         requirements(config, plugin)
     except RequirementError as e:
-        LOG.error(str(e))
+        plugin.log.error(str(e))
+        raise
+    try:
+        copy_secrets(config, plugin)
+    except MissingSecretFileError:
+        plugin.log.error(str(e))
         raise
     plugin.log.boot("Ready for deployment...")
     #run(config, plugin, manager)
@@ -44,6 +54,8 @@ def contextualize(config, plugin):
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
         config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
         config.LAUNCH = config.LAUNCH.format(root=plugin.root)
+        for secret in config.SECRETS:
+            config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
 
 
 def requirements(config, plugin):
@@ -75,6 +87,27 @@ def requirements(config, plugin):
     plugin.log.boot("Requirements processed successfully...")
 
 
+def copy_secrets(config, plugin):
+    """
+    Copy any potential secrets a plugin could have from the AIGIS secret dump to the specified location.
+    Will not copy anything is a file is missing.
+
+    :param module config: config module for this plugin
+    :param AigisPlugin plugin: plugin registered in core
+
+    :raises MissingSecretFileError: if a specified secret cannot be found.
+    """
+    missing_secrets = []
+    for secret in config.SECRETS:
+        if not os.path.exists(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret))):
+            missing_secrets.append(secret)
+    if not missing_secrets:
+        for secret in config.SECRETS:
+            shutil.copy2(secret, config.SECRETS[secret])
+    else:
+        raise MissingSecretFileError("The following secret files are missing:\n" + ", ".join(missing_secrets))
+
+
 def run(config, plugin, manager):
     """
     This function launches the plugin following different logic depending on the plugin type
@@ -102,4 +135,9 @@ async def _run_async_subprocess(config, plugin, manager):
 class RequirementError(Exception):
     """
     Error for issues in handling plugin requirements.
+    """
+
+class MissingSecretFileError(Exception):
+    """
+    Error to be thrown when a specified secrets file cannot be found.
     """

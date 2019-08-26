@@ -51,7 +51,7 @@ class PluginManager(list):
             try:
                 self.append(self._aigisplugin_load_wrapper(plugin, plugin_path, plugin_config, log_manager))
             except:  #pylint: disable=bare-except
-                LOG.error("Could not load plugin %s!\n%s", plugin, traceback.format_exc(limit=3))
+                LOG.error("Could not load plugin %s!\n%s", plugin, traceback.format_exc(limit=2))
 
     def add_to_core(self, plugin):
         """
