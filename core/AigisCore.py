@@ -43,7 +43,3 @@ class Aigis():
         LOG.shutdown("Cleaning up the core...")
         self.plugins.cleanup()
         self.log_manager.cleanup()
-
-
-# Aigis needs to
-# - ???
