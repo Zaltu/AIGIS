@@ -5,6 +5,7 @@ import os
 import sys
 import logging
 
+from utils.path_utils import ensure_file_exists  #pylint: disable=no-name-in-module
 
 def _plugin_file_name(plugin):
     """
@@ -15,7 +16,11 @@ def _plugin_file_name(plugin):
     :returns: absolute log file path
     :rtype: str
     """
-    return os.path.abspath(os.path.join(PLUGIN_LOG_LOCATION, "_".join([plugin.name, plugin.id])))
+    return os.path.abspath(
+        os.path.join(
+            PLUGIN_LOG_LOCATION,
+            "_".join([plugin.name, str(plugin.id)]) + ".log")
+    )
 
 
 def _add_log_handlers(logger, logfile):
@@ -25,9 +30,7 @@ def _add_log_handlers(logger, logfile):
     :param logging.logger logger: the logger to configure
     :param str logfile: file to log to disk
     """
-    if not os.path.exists(logfile):
-        with open(logfile, 'w+'):
-            pass
+    ensure_file_exists(logfile)
     logger.setLevel(logging.INFO)
     fh = logging.FileHandler(logfile)
     fh.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))

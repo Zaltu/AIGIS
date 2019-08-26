@@ -61,4 +61,4 @@ class LogManager():
         """
         LOG.shutdown("Cleaning up registered loggers...")
         for logger in self.loggers:
-            logger.cleanup()
+            self.loggers[logger].cleanup()

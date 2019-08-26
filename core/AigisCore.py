@@ -34,7 +34,7 @@ class Aigis():
         self.plugins = PluginManager()
 
         # Load the plugins
-        self.plugins.load_all(self.config["plugins"])
+        self.plugins.load_all(self.config["plugins"], self.log_manager)
 
     def cleanup(self):
         """

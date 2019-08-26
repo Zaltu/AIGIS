@@ -5,10 +5,10 @@ that pipe their outputs to the core.
 import logging
 from collections import deque
 
-from diary.LogUtils import _add_log_handlers, _plugin_file_name, LOG  #pylint: disable=no-name-in-module
+from diary.LogUtils import _add_log_handlers, _plugin_file_name, LOG
 
 
-class AigisLogger():
+class AigisLogger(logging.getLoggerClass()):
     """
     Substitute class for logging with funcitonality depending on the plugin type.
 
@@ -22,12 +22,12 @@ class AigisLogger():
     logger = None
     log_file = None
     def __init__(self, plugin):
+        super().__init__(self)
         self.log_file = _plugin_file_name(plugin)
-        if plugin.type == "external-pipe":
+        self.name = plugin.name
+        _add_log_handlers(self, self.log_file)
+        if plugin.type in ["external", "external-pipe"]:
             self.filehandler = open(self.log_file, 'a+')
-        elif plugin.type in ["internal", "core"]:
-            self.logger = logging.getLogger(plugin.name)
-            _add_log_handlers(self.logger, self.log_file)
 
     def tail(self):
         """
@@ -49,3 +49,4 @@ class AigisLogger():
         """
         if self.filehandler:
             self.filehandler.close()
+            self.shutdown("Closed log file handler.")
