@@ -7,3 +7,6 @@ log/
 
 # Ignore downloaded extensions
 ext/
+
+# Ignore vscode config
+.vscode/
