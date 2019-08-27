@@ -8,5 +8,8 @@ log/
 # Ignore downloaded extensions
 ext/
 
+# Ignore secret directory
+secrets/
+
 # Ignore vscode config
 .vscode/
