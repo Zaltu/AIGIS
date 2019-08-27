@@ -116,7 +116,7 @@ def run(config, plugin, manager):
     :raises InvalidPluginTypeError: if the plugin type specified in the plugin config is not valid
     """
     if config.PLUGIN_TYPE == "external":
-        ALOOP.run_until_complete(_run_async_subprocess(config, plugin, manager))
+        ALOOP.run_until_complete(_run_external(config, plugin, manager))
         plugin.log.boot("Running...")
     elif config.PLUGIN_TYPE == "core":
         pass
@@ -126,7 +126,7 @@ def run(config, plugin, manager):
         raise InvalidPluginTypeError("Cannot process plugin type %s." % config.PLUGIN_TYPE)
 
 
-async def _run_async_subprocess(config, plugin, manager):
+async def _run_external(config, plugin, manager):
     """
     Launch an asyncio subprocess and request scheduling for the watchdog task.
     """
