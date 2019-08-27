@@ -118,7 +118,7 @@ def run(config, plugin, manager):
     :param PluginManager manager: this instance's PluginManager to be passed to the WatchDog
     for external processes
     """
-    if config.PLUGIN_TYPE in ["external", "external-pipe"]:
+    if config.PLUGIN_TYPE == "external":
         ALOOP.run_until_complete(_run_async_subprocess(config, plugin, manager))
 
     plugin.log.boot("Running...")
