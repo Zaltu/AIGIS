@@ -4,7 +4,6 @@ Helper module to hold and organize loaded plugins.
 import os
 import importlib.util
 import subprocess
-import traceback
 
 import pygit2
 
@@ -34,24 +33,11 @@ class PluginManager(list):
         :param LogManager log_manager: the log manager for this AIGIS instance
         """
         LOG.boot("Downloading configured plugins...")
-        for plugin in config:
-            plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin)
+        for plugin_name in config:
+            LOG.info("Loading plugin %s", plugin_name)
+            plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
             plugin_config_path = os.path.join(plugin_path, "AigisBot/config.py")
-
-            LOG.boot("Downloading plugin %s...", plugin)
-            if not download_plugin(plugin, config[plugin], plugin_path):
-                continue
-
-            LOG.boot("Getting %s config...", plugin)
-            plugin_config = _plugin_config_generator(plugin, plugin_config_path)
-            if not plugin_config:
-                continue
-
-            LOG.boot("Prepping and launching %s", plugin)
-            try:
-                self.append(self._aigisplugin_load_wrapper(plugin, plugin_path, plugin_config, log_manager))
-            except:  #pylint: disable=bare-except
-                LOG.error("Could not load plugin %s!\n%s", plugin, traceback.format_exc(limit=2))
+            self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
 
     def add_to_core(self, plugin):
         """
@@ -87,7 +73,7 @@ class PluginManager(list):
             if plugin in self.external:
                 self.external.remove(plugin)
 
-        plugin.log.SHUTDOWN("Plugin buried.")
+        plugin.log.SHUTDOWN("Plugin shut down.")
         LOG.warning("%s has terminated.", plugin.name)
 
     def cleanup(self):
@@ -98,52 +84,73 @@ class PluginManager(list):
         for plugin in self:
             plugin.cleanup()
 
-    def _aigisplugin_load_wrapper(self, plugin_name, plugin_path, plugin_config, log_manager):
-        """
-        Wrapper around AigisPlugin instantiation to avoid python object reference issues.
+    def _load_one(self, plugin_name, plugin_path, plugin_config_path, log_manager, plugin_url):
+        plugin = AigisPlugin(plugin_name, plugin_path, log_manager)
 
-        :param str plugin_name: plugin name
-        :param str plugin_path: path to plugin
+        plugin.log.boot("Downloading plugin...")
+        if not download_plugin(plugin, plugin_url, plugin_path):
+            return
+
+        plugin.log.boot("Getting config...")
+        plugin_config = _plugin_config_generator(plugin, plugin_config_path)
+        if not plugin_config:
+            return
+
+        # VERY IMPORTANT
+        plugin.type = plugin_config.PLUGIN_TYPE
+
+        plugin.log.boot("Prepping and launching...")
+        try:
+            self.append(self._aigisplugin_load_wrapper(plugin, plugin_config))
+        except:  #pylint: disable=bare-except
+            LOG.error("Could not load plugin %s!", plugin.name)
+
+    def _aigisplugin_load_wrapper(self, plugin, plugin_config):
+        """
+        Specifically load the plugin.
+
+        :param AigisPlugin plugin: the plugin object
         :param str plugin_config: plugin config module
-        :param LogManager log_manager: the log manager for this AIGIS instance
 
         :returns: plugin object
         :rtype: AigisPlugin
 
         :raises RequirementError: if there is an Exception while processing the plugin's requirements.
+        :raises MissingSecretFileError: if there is a missing secret file for this plugin
         """
-        plugin = AigisPlugin(plugin_name, plugin_path, plugin_config.PLUGIN_TYPE, log_manager)
         try:
             PluginLoader.load(plugin_config, plugin, self)
-        except PluginLoader.RequirementError:
+        except (PluginLoader.RequirementError, PluginLoader.MissingSecretFileError):
+            plugin.log.shutdown("Could not load plugin, shutting down...")
             self.dead.append(plugin)
+            plugin.cleanup()
             raise
         return plugin
 
 
 
-def download_plugin(plugin_name, github_path, plugin_path):
+def download_plugin(plugin, github_path, plugin_path):
     """
     Download a plugin to a local path
 
-    :param str plugin_name: name of plugin to download
+    :param AigisPlugin plugin: plugin object
     :param str github_path: path to download
     :param str plugin_path: path to download to
 
     :returns: if instruction was successful
     :rtype: bool
     """
-    if ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin_name)):
+    if ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin.name)):
         try:
-            LOG.info("%s already installed, making sure it's up to date...", plugin_name)
+            plugin.log.info("Plugin already installed, making sure it's up to date...")
             subprocess.check_output(["git", "pull"], cwd=plugin_path)
         except Exception:  #pylint: disable=broad-except
-            LOG.warning("Unable to update plugin %s. Git Pull failed.", plugin_name)
+            plugin.log.warning("Unable to update plugin. Git Pull failed.")
         return True
     try:
         _download(github_path, plugin_path)
     except IOError:
-        LOG.error("Problem accessing filepath, skipping plugin %s", plugin_name)
+        plugin.log.error("Problem accessing filepath, skipping plugin")
         return False
     return True
 
@@ -158,11 +165,11 @@ def _download(url, plugin_path):
     pygit2.clone_repository(url, plugin_path, checkout_branch="new-aigis-setup")
 
 
-def _plugin_config_generator(plugin_name, config_path):
+def _plugin_config_generator(plugin, config_path):
     """
     Generate a new plugin config object
 
-    :param str plugin_name: plugin name
+    :param AigisPlugin plugin: plugin object
     :param str config_path: path to plugin config file
 
     :returns: config module or None
@@ -173,6 +180,6 @@ def _plugin_config_generator(plugin_name, config_path):
     try:
         spec.loader.exec_module(plugin_config)
     except FileNotFoundError:
-        LOG.error("Plugin %s has no AigisBot configuration file at %s", plugin_name, config_path)
+        plugin.log.error("No AigisBot configuration file found at %s", config_path)
         return None
     return plugin_config

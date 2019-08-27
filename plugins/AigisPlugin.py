@@ -11,7 +11,7 @@ class AigisPlugin():
     :param str ptype: the plugin type
     :param LogManager log_manager: the log manager for this AIGIS instance
     """
-    def __init__(self, name, root, ptype, log_manager):
+    def __init__(self, name, root, log_manager, ptype=None):
         self.id = id(self)
         self.name = name
         self.root = root

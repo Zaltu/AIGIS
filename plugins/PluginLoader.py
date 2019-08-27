@@ -35,7 +35,7 @@ def load(config, plugin, manager):
         raise
     try:
         copy_secrets(config, plugin)
-    except MissingSecretFileError:
+    except MissingSecretFileError as e:
         plugin.log.error(str(e))
         raise
     plugin.log.boot("Ready for deployment...")
@@ -100,12 +100,12 @@ def copy_secrets(config, plugin):
     missing_secrets = []
     for secret in config.SECRETS:
         if not os.path.exists(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret))):
-            missing_secrets.append(secret)
+            missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
         for secret in config.SECRETS:
             shutil.copy2(secret, config.SECRETS[secret])
     else:
-        raise MissingSecretFileError("The following secret files are missing:\n" + ", ".join(missing_secrets))
+        raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
 
 
 def run(config, plugin, manager):
