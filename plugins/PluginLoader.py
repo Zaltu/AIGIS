@@ -24,22 +24,17 @@ def load(config, plugin, manager):
     :param AigisPlugin plugin: the plugin stored in core, regardless of plugin type.
     :param PluginManager manager: this instance's PluginManager
 
-    :raises RequirementError: if there is an Exception while processing the plugin's requirements.
-    :raises MissingSecretFileError: if one of the plugin's specified secrets files cannot be found.
+    :raises PluginLoadError: for any problem in loading the plugin
     """
-    contextualize(config, plugin)
     try:
+        contextualize(config, plugin)
         requirements(config, plugin)
-    except RequirementError as e:
-        plugin.log.error(str(e))
-        raise
-    try:
         copy_secrets(config, plugin)
-    except MissingSecretFileError as e:
+        plugin.log.boot("Ready for deployment...")
+        run(config, plugin, manager)
+    except PluginLoadError as e:
         plugin.log.error(str(e))
         raise
-    plugin.log.boot("Ready for deployment...")
-    #run(config, plugin, manager)
 
 
 def contextualize(config, plugin):
@@ -50,7 +45,7 @@ def contextualize(config, plugin):
     :param module config: this plugin's config
     :param AigisPlugin plugin: the plugin stored in core
     """
-    if 'external' in config.PLUGIN_TYPE:
+    if config.PLUGIN_TYPE == 'external':
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
         config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
         config.LAUNCH = config.LAUNCH.format(root=plugin.root)
@@ -117,11 +112,18 @@ def run(config, plugin, manager):
     :param AigisPlugin plugin: plugin to be passed to the WatchDog for external processes
     :param PluginManager manager: this instance's PluginManager to be passed to the WatchDog
     for external processes
+
+    :raises InvalidPluginTypeError: if the plugin type specified in the plugin config is not valid
     """
     if config.PLUGIN_TYPE == "external":
         ALOOP.run_until_complete(_run_async_subprocess(config, plugin, manager))
-
-    plugin.log.boot("Running...")
+        plugin.log.boot("Running...")
+    elif config.PLUGIN_TYPE == "core":
+        pass
+    elif config.PLUGIN_TYPE == "internal":
+        pass
+    else:
+        raise InvalidPluginTypeError("Cannot process plugin type %s." % config.PLUGIN_TYPE)
 
 
 async def _run_async_subprocess(config, plugin, manager):
@@ -132,12 +134,22 @@ async def _run_async_subprocess(config, plugin, manager):
     ALOOP.ensure_future(jiii(proc, plugin, manager))
 
 
-class RequirementError(Exception):
+class PluginLoadError(Exception):
+    """
+    Parent class for plugin load exceptions.
+    """
+
+class RequirementError(PluginLoadError):
     """
     Error for issues in handling plugin requirements.
     """
 
-class MissingSecretFileError(Exception):
+class MissingSecretFileError(PluginLoadError):
     """
     Error to be thrown when a specified secrets file cannot be found.
+    """
+
+class InvalidPluginTypeError(PluginLoadError):
+    """
+    Error when plugin config has an unsupported type.
     """

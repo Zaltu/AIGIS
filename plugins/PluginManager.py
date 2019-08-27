@@ -34,7 +34,7 @@ class PluginManager(list):
         """
         LOG.boot("Downloading configured plugins...")
         for plugin_name in config:
-            LOG.info("Loading plugin %s", plugin_name)
+            LOG.info("Loading plugin %s...", plugin_name)
             plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
             plugin_config_path = os.path.join(plugin_path, "AigisBot/config.py")
             self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
@@ -99,7 +99,7 @@ class PluginManager(list):
         # VERY IMPORTANT
         plugin.type = plugin_config.PLUGIN_TYPE
 
-        plugin.log.boot("Prepping and launching...")
+        plugin.log.boot("Preparing to launch...")
         try:
             self.append(self._aigisplugin_load_wrapper(plugin, plugin_config))
         except:  #pylint: disable=bare-except
@@ -115,12 +115,11 @@ class PluginManager(list):
         :returns: plugin object
         :rtype: AigisPlugin
 
-        :raises RequirementError: if there is an Exception while processing the plugin's requirements.
-        :raises MissingSecretFileError: if there is a missing secret file for this plugin
+        :raises PluginLoadError: for any error occurring while trying to launch the plugin
         """
         try:
             PluginLoader.load(plugin_config, plugin, self)
-        except (PluginLoader.RequirementError, PluginLoader.MissingSecretFileError):
+        except PluginLoader.PluginLoadError:
             plugin.log.shutdown("Could not load plugin, shutting down...")
             self.dead.append(plugin)
             plugin.cleanup()
