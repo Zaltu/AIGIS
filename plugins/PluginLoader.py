@@ -16,8 +16,10 @@ ALOOP = asyncio.get_event_loop()
 
 def load(config, plugin, manager):
     """
-    Set up the AIGIS plugin. This means executing the two major steps.
+    Set up the AIGIS plugin. This means executing the four major steps.
+    CONTEXTUALIZE
     REQUIREMENTS
+    SECRETS
     RUN
 
     :param module config: the config module for this plugin
