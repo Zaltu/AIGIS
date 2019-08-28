@@ -5,7 +5,7 @@ import os
 import shutil
 import asyncio
 from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
-from plugins.WatchDog import jiii
+from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
 SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
