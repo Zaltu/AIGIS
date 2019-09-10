@@ -4,6 +4,7 @@ Process AIGIS plugin.
 import os
 import shutil
 import asyncio
+from threading import Thread
 from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
@@ -12,7 +13,12 @@ SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__
 ensure_path_exists(SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
-ALOOP = asyncio.get_event_loop()
+# FUCKING WINDOWS REEEEEEEE
+if os.name == "nt":
+    ALOOP = asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(ALOOP)
+else:
+    ALOOP = asyncio.get_event_loop()
 
 def load(config, plugin, manager):
     """
@@ -50,7 +56,6 @@ def contextualize(config, plugin):
     if config.PLUGIN_TYPE == 'external':
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
         config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
-        config.LAUNCH = config.LAUNCH.format(root=plugin.root)
         for secret in config.SECRETS:
             config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
 
@@ -100,7 +105,7 @@ def copy_secrets(config, plugin):
             missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
         for secret in config.SECRETS:
-            shutil.copy2(secret, config.SECRETS[secret])
+            shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), config.SECRETS[secret])
     else:
         raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
 
@@ -120,6 +125,7 @@ def run(config, plugin, manager):
     if config.PLUGIN_TYPE == "external":
         ALOOP.run_until_complete(_run_external(config, plugin, manager))
         plugin.log.boot("Running...")
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
         pass
     elif config.PLUGIN_TYPE == "internal":
@@ -130,11 +136,17 @@ def run(config, plugin, manager):
 
 async def _run_external(config, plugin, manager):
     """
-    Launch an asyncio subprocess and request scheduling for the watchdog task.
+    Launch an asyncio subprocess.
     """
-    proc = await asyncio.create_subprocess_exec(config.LAUNCH, cwd=config.ENTRYPOINT)
-    ALOOP.ensure_future(jiii(proc, plugin, manager))
+    plugin._ext_proc = await asyncio.create_subprocess_exec(*config.LAUNCH, cwd=config.ENTRYPOINT)
 
+
+def _threaded_async_process_wait(plugin, manager):
+    """
+    Launch the Watchdog for this plugin's process.
+    Can only be called on an external plugin.
+    """
+    ALOOP.run_until_complete(jiii(plugin, manager))
 
 class PluginLoadError(Exception):
     """
