@@ -4,6 +4,7 @@ Process AIGIS plugin.
 import os
 import shutil
 import asyncio
+from threading import Thread
 from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
@@ -12,7 +13,12 @@ SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__
 path_utils.ensure_path_exists(SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
-ALOOP = asyncio.get_event_loop()
+# FUCKING WINDOWS REEEEEEEE
+if os.name == "nt":
+    ALOOP = asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(ALOOP)
+else:
+    ALOOP = asyncio.get_event_loop()
 
 def load(config, plugin, manager):
     """
@@ -51,7 +57,6 @@ def contextualize(config, plugin):
     if config.PLUGIN_TYPE == 'external':
         config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
         config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
-        config.LAUNCH = config.LAUNCH.format(root=plugin.root)
         for secret in config.SECRETS:
             config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
 
@@ -101,7 +106,7 @@ def copy_secrets(config, plugin):
             missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
         for secret in config.SECRETS:
-            shutil.copy2(secret, config.SECRETS[secret])
+            shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), config.SECRETS[secret])
     else:
         raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
 
@@ -119,8 +124,9 @@ def run(config, plugin, manager):
     :raises InvalidPluginTypeError: if the plugin type specified in the plugin config is not valid
     """
     if config.PLUGIN_TYPE == "external":
-        ALOOP.run_until_complete(_run_external(config, plugin, manager))
+        ALOOP.run_until_complete(_run_external(config, plugin))
         plugin.log.boot("Running...")
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
         manager.skills._learnskill(mod_utils.import_from_path(config.LAUNCH))
         plugin.log.boot("Skills acquired.")
@@ -130,13 +136,22 @@ def run(config, plugin, manager):
         raise InvalidPluginTypeError("Cannot process plugin type %s." % config.PLUGIN_TYPE)
 
 
-async def _run_external(config, plugin, manager):
+async def _run_external(config, plugin):
     """
-    Launch an asyncio subprocess and request scheduling for the watchdog task.
+    Launch an asyncio subprocess.
     """
-    proc = await asyncio.create_subprocess_exec(config.LAUNCH, cwd=config.ENTRYPOINT)
-    ALOOP.ensure_future(jiii(proc, plugin, manager))
+    plugin._ext_proc = await asyncio.create_subprocess_exec(*config.LAUNCH, cwd=config.ENTRYPOINT)
 
+
+def _threaded_async_process_wait(plugin, manager):
+    """
+    Launch the Watchdog for this plugin's process.
+    Can only be called on an external plugin.
+
+    :param AigisPlugin plugin: the external plugin to wait for.
+    :param PluginManager manager: this instance's PluginManager
+    """
+    ALOOP.run_until_complete(jiii(plugin, manager))
 
 class PluginLoadError(Exception):
     """
@@ -157,28 +172,3 @@ class InvalidPluginTypeError(PluginLoadError):
     """
     Error when plugin config has an unsupported type.
     """
-
-
-"""
-Sample test config for AigisConfig type
-
-# All
-PLUGIN_TYPE = "external"
-LAUNCH = "python3.6 {root}/src/main.py"
-
-REQUIREMENT_COMMAND = "pip3.6 install -r"
-REQUIREMENT_FILE = "{root}/requirements.txt"
-
-SECRETS = {
-    "discordKey.secret": "{root}/src/db/",
-    "ip.config": "{root}/src/db/",
-    "tenor.secret": "{root}/src/db/"
-}
-
-
-# Internal and External
-ENTRYPOINT = "{root}"
-
-# External only
-SYSTEM_REQUIREMENTS = ["python3.6", "pip3.6"]
-"""

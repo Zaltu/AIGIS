@@ -41,6 +41,7 @@ class PluginManager(list):
             plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
             plugin_config_path = os.path.join(plugin_path, "AigisBot/config.py")
             self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
+        LOG.boot("All plugins loaded!")
 
     def add_to_core(self, plugin):
         """
@@ -76,7 +77,7 @@ class PluginManager(list):
             if plugin in self.external:
                 self.external.remove(plugin)
 
-        plugin.log.SHUTDOWN("Plugin shut down.")
+        plugin.log.shutdown("Plugin shut down.")
         LOG.warning("%s has terminated.", plugin.name)
 
     def cleanup(self):
@@ -122,6 +123,7 @@ class PluginManager(list):
         :rtype: AigisPlugin
 
         :raises PluginLoadError: for any error occurring while trying to launch the plugin
+        :raises Exception: for any other system errors preventing the plugin from being launched.
         """
         try:
             PluginLoader.load(plugin_config, plugin, self)
@@ -129,6 +131,9 @@ class PluginManager(list):
             plugin.log.shutdown("Could not load plugin, shutting down...")
             self.dead.append(plugin)
             plugin.cleanup()
+            raise
+        except Exception as e:
+            plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", str(e))
             raise
         return plugin
 
@@ -167,4 +172,4 @@ def _download(url, plugin_path):
     :param str url: the github url to download ("account/repo-name")
     :param str plugin_path: path to download to
     """
-    pygit2.clone_repository(url, plugin_path, checkout_branch="new-aigis-setup")
+    pygit2.clone_repository(url, plugin_path, checkout_branch="master")
