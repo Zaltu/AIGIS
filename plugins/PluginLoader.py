@@ -4,12 +4,12 @@ Process AIGIS plugin.
 import os
 import shutil
 import asyncio
-from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
 SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
-ensure_path_exists(SECRET_DUMP)
+path_utils.ensure_path_exists(SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
@@ -43,6 +43,7 @@ def contextualize(config, plugin):
     """
     Apply any plugin contextualization that could be needed to the config,
     depending on numerous factors.
+    This is kind of silly, but I'm not sure how to make it better.
 
     :param module config: this plugin's config
     :param AigisPlugin plugin: the plugin stored in core
@@ -121,7 +122,8 @@ def run(config, plugin, manager):
         ALOOP.run_until_complete(_run_external(config, plugin, manager))
         plugin.log.boot("Running...")
     elif config.PLUGIN_TYPE == "core":
-        pass
+        manager.skills._learnskill(mod_utils.import_from_path(config.LAUNCH))
+        plugin.log.boot("Skills acquired.")
     elif config.PLUGIN_TYPE == "internal":
         pass
     else:
@@ -155,3 +157,28 @@ class InvalidPluginTypeError(PluginLoadError):
     """
     Error when plugin config has an unsupported type.
     """
+
+
+"""
+Sample test config for AigisConfig type
+
+# All
+PLUGIN_TYPE = "external"
+LAUNCH = "python3.6 {root}/src/main.py"
+
+REQUIREMENT_COMMAND = "pip3.6 install -r"
+REQUIREMENT_FILE = "{root}/requirements.txt"
+
+SECRETS = {
+    "discordKey.secret": "{root}/src/db/",
+    "ip.config": "{root}/src/db/",
+    "tenor.secret": "{root}/src/db/"
+}
+
+
+# Internal and External
+ENTRYPOINT = "{root}"
+
+# External only
+SYSTEM_REQUIREMENTS = ["python3.6", "pip3.6"]
+"""

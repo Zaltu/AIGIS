@@ -2,13 +2,13 @@
 Helper module to hold and organize loaded plugins.
 """
 import os
-import importlib.util
 import subprocess
 
 import pygit2
 
-from utils.path_utils import ensure_path_exists  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
+from plugins.core.Skills import Skills
 from plugins import PluginLoader
 from diary.AigisLog import LOG
 
@@ -23,7 +23,10 @@ class PluginManager(list):
     dead = []
     def __init__(self):
         super().__init__(self)
-        ensure_path_exists(PLUGIN_ROOT_PATH)
+        path_utils.ensure_path_exists(PLUGIN_ROOT_PATH)
+
+        # Prepare the skills singleton for core plugins
+        self.skills = Skills()
 
     def load_all(self, config, log_manager):
         """
@@ -92,7 +95,10 @@ class PluginManager(list):
             return
 
         plugin.log.boot("Getting config...")
-        plugin_config = _plugin_config_generator(plugin, plugin_config_path)
+        try:
+            plugin_config = mod_utils.import_from_path(plugin_config_path)
+        except FileNotFoundError as e:
+            plugin.log.error(str(e))
         if not plugin_config:
             return
 
@@ -139,7 +145,7 @@ def download_plugin(plugin, github_path, plugin_path):
     :returns: if instruction was successful
     :rtype: bool
     """
-    if ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin.name)):
+    if path_utils.ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin.name)):
         try:
             plugin.log.info("Plugin already installed, making sure it's up to date...")
             subprocess.check_output(["git", "pull"], cwd=plugin_path)
@@ -162,23 +168,3 @@ def _download(url, plugin_path):
     :param str plugin_path: path to download to
     """
     pygit2.clone_repository(url, plugin_path, checkout_branch="new-aigis-setup")
-
-
-def _plugin_config_generator(plugin, config_path):
-    """
-    Generate a new plugin config object
-
-    :param AigisPlugin plugin: plugin object
-    :param str config_path: path to plugin config file
-
-    :returns: config module or None
-    :rtype: Module
-    """
-    spec = importlib.util.spec_from_file_location("config", config_path)
-    plugin_config = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(plugin_config)
-    except FileNotFoundError:
-        plugin.log.error("No AigisBot configuration file found at %s", config_path)
-        return None
-    return plugin_config
