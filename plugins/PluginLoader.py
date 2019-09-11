@@ -5,7 +5,7 @@ import os
 import shutil
 import asyncio
 from threading import Thread
-from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
+from utils import path_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
@@ -128,7 +128,7 @@ def run(config, plugin, manager):
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
-        manager.skills._learnskill(mod_utils.import_from_path(config.LAUNCH))
+        manager.skills._learnskill(config)
         plugin.log.boot("Skills acquired.")
     elif config.PLUGIN_TYPE == "internal":
         pass

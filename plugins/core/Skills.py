@@ -16,7 +16,7 @@ class Skills():
         :param AigisLogger.log log: plugin's logger
         """
         for name, cls in mod.__dict__.items():
-            if callable(cls):
+            if name in mod.SKILLS and callable(cls):
                 setattr(mod, name, decorator(cls, log))
         toadd = [(name, cls) for name, cls in mod.__dict__.items() if name in mod.SKILLS]
         self.__dict__.update(dict(toadd))

@@ -39,7 +39,7 @@ class PluginManager(list):
         for plugin_name in config:
             LOG.info("Loading plugin %s...", plugin_name)
             plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
-            plugin_config_path = os.path.join(plugin_path, "AigisBot/config.py")
+            plugin_config_path = os.path.join(plugin_path, "AIGIS")
             self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
         LOG.boot("All plugins loaded!")
 
