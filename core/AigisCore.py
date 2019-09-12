@@ -30,7 +30,7 @@ class Aigis():
         self.log_manager = LogManager()
 
         # Launch the plugin manager
-        LOG.boot("Launching plugin manager")
+        LOG.boot("Launching plugin manager...")
         self.plugins = PluginManager()
 
         # Load the plugins
