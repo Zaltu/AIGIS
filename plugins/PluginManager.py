@@ -39,8 +39,11 @@ class PluginManager(list):
         for plugin_name in config:
             LOG.info("Loading plugin %s...", plugin_name)
             plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
-            plugin_config_path = os.path.join(plugin_path, "AIGIS")
-            self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
+            plugin_config_path = os.path.join(plugin_path, "AIGIS/AIGIS.config")
+            try:
+                self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
+            except:  #pylint: disable=bare-except
+                LOG.error("Could not load plugin %s!", plugin_name)
         LOG.boot("All plugins loaded!")
 
     def add_to_core(self, plugin):
@@ -89,6 +92,26 @@ class PluginManager(list):
             plugin.cleanup()
 
     def _load_one(self, plugin_name, plugin_path, plugin_config_path, log_manager, plugin_url):
+        """
+        Fully load one plugin. This includes
+        - generating the AigisPlugin object (with logger)
+        - downloading the plugin source if necessary, or
+        - updating it if it already exists
+        - loading the plugin config as a module and
+        - attempting to load the plugin via PluginLoader
+        This function handles only logging error and issues to the plugin-specific loggers.
+        In any case of error loading the plugin, an exception will be raised.
+
+        :param str plugin_name: name of plugin to load
+        :param str plugin_path: local path the plugin should reside in
+        :param str plugin_config_path: path to the local AIGIS-compatible config file for this plugin
+        :param LogManager log_manager: the AIGIS LogManager singleton for this execution
+        :param str plugin_url: web URL from which to download the plugin
+
+        :raises FileNotFoundError: explicitely if the config file cannot be found locally once the plugin
+        has been downloaded
+        :raises Exeption: numerous exception types can be bubbled up from the various loading mechanisms
+        """
         plugin = AigisPlugin(plugin_name, plugin_path, log_manager)
 
         plugin.log.boot("Downloading plugin...")
@@ -100,17 +123,15 @@ class PluginManager(list):
             plugin_config = mod_utils.import_from_path(plugin_config_path)
         except FileNotFoundError as e:
             plugin.log.error(str(e))
-        if not plugin_config:
-            return
+            plugin.log.shutdown("Could not get configuration for plugin %s!", plugin.name)
+            raise
 
         # VERY IMPORTANT
         plugin.type = plugin_config.PLUGIN_TYPE
 
         plugin.log.boot("Preparing to launch...")
-        try:
-            self.append(self._aigisplugin_load_wrapper(plugin, plugin_config))
-        except:  #pylint: disable=bare-except
-            LOG.error("Could not load plugin %s!", plugin.name)
+        self.append(self._aigisplugin_load_wrapper(plugin, plugin_config))
+
 
     def _aigisplugin_load_wrapper(self, plugin, plugin_config):
         """

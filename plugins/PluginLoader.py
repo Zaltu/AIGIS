@@ -2,10 +2,11 @@
 Process AIGIS plugin.
 """
 import os
+import sys
 import shutil
 import asyncio
 from threading import Thread
-from utils import path_utils  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
@@ -54,11 +55,10 @@ def contextualize(config, plugin):
     :param module config: this plugin's config
     :param AigisPlugin plugin: the plugin stored in core
     """
-    if config.PLUGIN_TYPE == 'external':
-        config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
-        config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
-        for secret in config.SECRETS:
-            config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
+    config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
+    config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
+    for secret in config.SECRETS:
+        config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
 
 
 def requirements(config, plugin):
@@ -128,7 +128,12 @@ def run(config, plugin, manager):
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
-        manager.skills._learnskill(config)
+        manager.skills._learnskill(
+            mod_utils.import_from_path(
+                _prep_core_injector_file(plugin, config)
+            ),
+            plugin.log
+        )
         plugin.log.boot("Skills acquired.")
     elif config.PLUGIN_TYPE == "internal":
         pass
@@ -153,6 +158,18 @@ def _threaded_async_process_wait(plugin, manager):
     """
     ALOOP.run_until_complete(jiii(plugin, manager))
 
+
+def _prep_core_injector_file(plugin, config):
+    core_file = os.path.join(plugin.root, "AIGIS/AIGIS.core")
+    if not os.path.exists(core_file):
+        raise InvalidPluginTypeError(
+            "No AIGIS/AIGIS.core file found. Plugin is not configured as a core plugin..."
+        )
+    # We need to add the plugin config's entrypoint to the PYTHONPATH
+    # so imports work as expected on requirements
+    sys.path.append(config.ENTRYPOINT)
+    return core_file
+
 class PluginLoadError(Exception):
     """
     Parent class for plugin load exceptions.
@@ -170,5 +187,5 @@ class MissingSecretFileError(PluginLoadError):
 
 class InvalidPluginTypeError(PluginLoadError):
     """
-    Error when plugin config has an unsupported type.
+    Error when plugin config has an unsupported type or is not configured for it's type.
     """
