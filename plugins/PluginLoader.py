@@ -160,6 +160,21 @@ def _threaded_async_process_wait(plugin, manager):
 
 
 def _prep_core_injector_file(plugin, config):
+    """
+    Fetch the path to the core injection file of a core plugin.
+    We need to append the core plugin's ENTRYPOINT to the PYTHONPATH so that the core injection
+    file can process relative imports independantly of where the plugin is locally loaded. Without
+    this step, imports in those files would have to include "ext.<plugin_name>." in front of every
+    import...
+
+    :param AigisPlugin plugin: the core plugin to load
+    :param module config: the core plugin's config
+
+    :returns: the local path to the core plugin injector file
+    :rtype: str
+
+    :raises InvalidPluginTypeError: if no injector file can be found, the plugin must be misconfigured.
+    """
     core_file = os.path.join(plugin.root, "AIGIS/AIGIS.core")
     if not os.path.exists(core_file):
         raise InvalidPluginTypeError(
