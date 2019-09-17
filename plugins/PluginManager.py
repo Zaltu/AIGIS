@@ -8,7 +8,6 @@ import pygit2
 
 from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
-from plugins.core.Skills import Skills
 from plugins import PluginLoader
 from diary.AigisLog import LOG
 
@@ -24,9 +23,6 @@ class PluginManager(list):
     def __init__(self):
         super().__init__(self)
         path_utils.ensure_path_exists(PLUGIN_ROOT_PATH)
-
-        # Prepare the skills singleton for core plugins
-        self.skills = Skills()
 
     def load_all(self, config, log_manager):
         """

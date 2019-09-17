@@ -2,9 +2,11 @@
 Responsible for the maintenance and redirecting of all AIGIS's core and plugin features
 """
 import atexit
+import sys
 import toml
 
 from plugins.PluginManager import PluginManager
+from plugins.core.Skills import Skills
 from diary.LogManager import LogManager
 from diary.LogUtils import LOG
 
@@ -28,6 +30,11 @@ class Aigis():
         # Launch the logging manager
         LOG.boot("Launching global logging service...")
         self.log_manager = LogManager()
+
+        # Launch the core skill system container
+        self.skills = Skills()
+        # Expose the core skills object as importable module in order to meme the python syntax
+        sys.modules["aigis"] = self.skills
 
         # Launch the plugin manager
         LOG.boot("Launching plugin manager...")

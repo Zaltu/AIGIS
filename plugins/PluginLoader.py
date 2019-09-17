@@ -128,7 +128,8 @@ def run(config, plugin, manager):
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
-        manager.skills._AIGISlearnskill(
+        import aigis as core_skills # AigisCore.skills
+        core_skills._AIGISlearnskill(
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin, config)
             ),
