@@ -1,6 +1,8 @@
 """
 Container class for the singleton which holds all core plugins' modules for shared use.
 """
+from utils import exc_utils  #pylint: disable=no-name-in-module
+
 
 class Skills():
     """
@@ -12,55 +14,45 @@ class Skills():
         """
         Join a given dict with this class' dict, essentially extending the functionality of the class.
 
-        :param module mod: a plugin configuration for the CORE plugin type
-        :param AigisLogger.log log: plugin's logger
+        :param module mod: module who's functionality to port
+        :param logging.logger log: this AigisPlugin's logger
         """
-
         for name in mod.SKILLS:
-            try:
-                # Initialize namespace traversing objects
-                pseq = name.split(".")
-                i = 0
-                leafdict = mod
-                # Deal with the top-level namespace if we can.
-                # This prevents us from having to generate a namespace buffer object for everything
-                if pseq[i] in leafdict.__dict__:
-                    leafdict = getattr(mod, pseq[i])
-                    i += 1
-                # Recursively traverse the rest of the point sequence
-                leafdict = self._AIGISrecurdict(leafdict, pseq, i)
-                # Set the branch as a self attribute. Don't forget to decorate callables with the logger
-                setattr(self, pseq[0], decorator(leafdict, log))
-                log.boot("Registered %s", name)
-            except NamespaceLockError as e:
-                log.error(str(e))
+            pseq = name.split(".")
+            self._AIGISrecurdict(mod, pseq, 0, self, log)
+            log.boot("Registered %s...", name)
 
-    def _AIGISrecurdict(self, mod, pseq, i):
+    def _AIGISrecurdict(self, mod, pseq, i, ns, log):
         """
-        Recursively parse the given module based on the point sequence given and return a
-        callable namespace containing the full path to the injected object.
+        False recursivity to parse the point sequence of the submitted injection and copy the
+        attributes into a namespace proxy within this Skills instance.
 
-        Do NOT call this randomly
+        Do NOT call randomly.
 
-        :param object mod: object namespace to parse this round
-        :param list pseq: list of dot-separated values denoting the injection path
-        :param int i: current index in pseq, initially 0
+        :param object mod: object at this layer of the point sequence
+        :param list[str] pseq: the complete point sequence
+        :param int i: current point sequence index
+        :param object ns: _Namespace or parent module in which to add the current point sequence object
+        :param logging.logger log: the injecting AigisPlugin's logger for decorating callables
 
-        :returns: namespace path to injected object
-        :rtype: object
-        :raises NamespaceLockError: if the point sequence cannot be followed in the injected namespace
+        :raises NamespaceLockError: if the point sequence cannot be followed. While this could be
+        some meme python thing, most times it is probably because of a typo or logic error in the
+        injector file's SKILLS list.
         """
-        if i == len(pseq):
-            # Exit condition, we've reached the end of the point sequence
-            return mod
+        if i+1 == len(pseq):
+            setattr(ns, pseq[i], decorator(getattr(mod, pseq[i]), log))
+            return
         if pseq[i] in dir(mod):
-            ns = _Namespace()
-            setattr(ns, pseq[i], getattr(mod, pseq[i]))
-            return self._recurdict(ns, pseq, i+1)
-        # The entry in the point sequence for this index can't be found in this namespace layer...
-        # This could be some weird python thing, but more likely someone typoed or incorrectly
-        # imported their values in their injector file.
-        raise NamespaceLockError("Module path %s cannot be followed" % ".".join(pseq))
+            if pseq[i] in dir(ns):
+                self._AIGISrecurdict(getattr(mod, pseq[i]), pseq, i+1, getattr(ns, pseq[i]), log)
+            else:
+                setattr(ns, pseq[i], _Namespace())
+                self._AIGISrecurdict(getattr(mod, pseq[i]), pseq, i+1, getattr(ns, pseq[i]), log)
+            return
+        raise NamespaceLockError(
+            "Module path %s cannot be followed. Cannot find %s in %s...\n%s" %
+            (".".join(pseq), pseq[i], mod, dir(mod))
+        )
 
 
 class _Namespace():
@@ -68,7 +60,8 @@ class _Namespace():
     Container class namespace for rebuilding point sequences
     """
 
-class NamespaceLockError(Exception):
+
+class NamespaceLockError(exc_utils.PluginLoadError):
     """
     Error for when a requested importable cannot be found within
     the layered namespaces of the injection module
@@ -90,13 +83,24 @@ def decorator(f, log):
         return f
     def internal(*args, **kwargs):
         """
-        Call the callable with the plugin's log as named argument
+        Call the callable with the plugin's log as named argument. If a TypeError is raised, quickly
+        check if it may be due to the injected function not supporting the "log" parameter and retry.
+        All other errors bubble up...
 
         :param args: the callable's args
         :param kwargs: the callable's kwargs
 
         :returns: the return of the callable
         :rtype: unknown
+
+        :raises TypeError: if a TypeError is raised from the called function, unless it is due to
+        not supporting the "log" parameter
         """
-        return f(log=log, *args, **kwargs)
+        try:
+            return f(*args, log=log, **kwargs)
+        except TypeError as e:
+            if "unexpected keyword argument 'log'" in str(e):
+                log.warning("Function %s called without AIGIS logging...", str(f))
+                return f(*args, **kwargs)
+            raise
     return internal

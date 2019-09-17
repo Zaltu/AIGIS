@@ -6,7 +6,7 @@ import sys
 import shutil
 import asyncio
 from threading import Thread
-from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
@@ -41,7 +41,7 @@ def load(config, plugin, manager):
         copy_secrets(config, plugin)
         plugin.log.boot("Ready for deployment...")
         run(config, plugin, manager)
-    except PluginLoadError as e:
+    except exc_utils.PluginLoadError as e:
         plugin.log.error(str(e))
         raise
 
@@ -128,7 +128,7 @@ def run(config, plugin, manager):
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
-        manager.skills._learnskill(
+        manager.skills._AIGISlearnskill(
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin, config)
             ),
@@ -185,22 +185,20 @@ def _prep_core_injector_file(plugin, config):
     sys.path.append(config.ENTRYPOINT)
     return core_file
 
-class PluginLoadError(Exception):
-    """
-    Parent class for plugin load exceptions.
-    """
 
-class RequirementError(PluginLoadError):
+class RequirementError(exc_utils.PluginLoadError):
     """
     Error for issues in handling plugin requirements.
     """
 
-class MissingSecretFileError(PluginLoadError):
+
+class MissingSecretFileError(exc_utils.PluginLoadError):
     """
     Error to be thrown when a specified secrets file cannot be found.
     """
 
-class InvalidPluginTypeError(PluginLoadError):
+
+class InvalidPluginTypeError(exc_utils.PluginLoadError):
     """
     Error when plugin config has an unsupported type or is not configured for it's type.
     """
