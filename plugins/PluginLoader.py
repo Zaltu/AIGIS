@@ -61,6 +61,8 @@ def contextualize(config, plugin):
     config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
     for secret in config.SECRETS:
         config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
+    if "LAUNCH" in config:  # core plugins do not have launch
+        config.LAUNCH = config.LAUNCH.format(root=plugin.root)
 
 
 def requirements(config, plugin):
@@ -179,6 +181,7 @@ def _threaded_async_process_wait(plugin, manager):
     :param PluginManager manager: this instance's PluginManager
     """
     ALOOP.run_until_complete(jiii(plugin, manager))
+
 
 def _threaded_child_process_wait(plugin, manager):
     jiiii(plugin, manager)
