@@ -150,6 +150,7 @@ Plugins are all loaded into a certain place on runtime that isn't necessarily ap
 - ENTRYPOINT
 - REQUIREMENTS_FILE
 - SECRETS (only the value, not the key)
+- LAUNCH (applicable for internal plugins)
 
 
 # Example Config Files
