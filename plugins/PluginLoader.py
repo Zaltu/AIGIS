@@ -5,9 +5,11 @@ import os
 import sys
 import shutil
 import asyncio
+import multiprocessing
 from threading import Thread
 from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
+from plugins.internal.WatchDog import jiiii  # 2smug
 
 # Set the dump location for plugin secrets
 SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
@@ -129,15 +131,34 @@ def run(config, plugin, manager):
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
     elif config.PLUGIN_TYPE == "core":
         import aigis as core_skills # AigisCore.skills
+        # We need to add the plugin config's entrypoint to the PYTHONPATH
+        # so imports work as expected on requirements
+        sys.path.append(config.ENTRYPOINT)
         core_skills._AIGISlearnskill(
             mod_utils.import_from_path(
-                _prep_core_injector_file(plugin, config)
+                _prep_core_injector_file(plugin)
             ),
             plugin.log
         )
         plugin.log.boot("Skills acquired.")
-    elif config.PLUGIN_TYPE == "internal":
-        pass
+    elif config.PLUGIN_TYPE == "internal-local":
+        import aigis as core_skills # AigisCore.skills
+        # We need to add the plugin config's entrypoint to the PYTHONPATH
+        # so imports work as expected on requirements
+        sys.path.append(config.ENTRYPOINT)
+        core_file = _prep_core_injector_file(plugin)
+        if core_file:
+            core_skills._AIGISlearnskill(
+                mod_utils.import_from_path(core_file),
+                plugin.log
+            )
+            plugin.log.boot("Internal plugin registered skills...")
+        plugin._int_proc = multiprocessing.Process(
+            target=_wrap_child_process_launch,
+            args=(plugin.LAUNCH, core_skills, plugin.log)
+        )
+        plugin._int_proc.start()
+        Thread(target=_threaded_child_process_wait, args=(plugin, manager)).start()
     else:
         raise InvalidPluginTypeError("Cannot process plugin type %s." % config.PLUGIN_TYPE)
 
@@ -159,8 +180,11 @@ def _threaded_async_process_wait(plugin, manager):
     """
     ALOOP.run_until_complete(jiii(plugin, manager))
 
+def _threaded_child_process_wait(plugin, manager):
+    jiiii(plugin, manager)
 
-def _prep_core_injector_file(plugin, config):
+
+def _prep_core_injector_file(plugin):
     """
     Fetch the path to the core injection file of a core plugin.
     We need to append the core plugin's ENTRYPOINT to the PYTHONPATH so that the core injection
@@ -169,7 +193,6 @@ def _prep_core_injector_file(plugin, config):
     import...
 
     :param AigisPlugin plugin: the core plugin to load
-    :param module config: the core plugin's config
 
     :returns: the local path to the core plugin injector file
     :rtype: str
@@ -178,13 +201,37 @@ def _prep_core_injector_file(plugin, config):
     """
     core_file = os.path.join(plugin.root, "AIGIS/AIGIS.core")
     if not os.path.exists(core_file):
-        raise InvalidPluginTypeError(
-            "No AIGIS/AIGIS.core file found. Plugin is not configured as a core plugin..."
-        )
-    # We need to add the plugin config's entrypoint to the PYTHONPATH
-    # so imports work as expected on requirements
-    sys.path.append(config.ENTRYPOINT)
+        if plugin.type == "core":
+            raise InvalidPluginTypeError(
+                "No AIGIS/AIGIS.core file found. Plugin is not configured as a core plugin..."
+            )
+        return None
     return core_file
+
+
+def _wrap_child_process_launch(fpath, aigis, log):
+    """
+    Get a function wrapping the functionality needed to launch an internal plugin with the correct
+    AIGIS runtime context. Sets the aigis instance as an importable module and calls the start
+    function with the logger.
+
+    NEVER CALL THIS DIRECTLY IN THE MAIN PROCESS.
+
+    :param str fpath: path to launch file
+    :param object aigis: the aigis core module
+    :param logging.logger log: the plugin's AigisLog's logger
+
+    :raises AttributeError: amongst other things when no "launch" function can be found in the specified
+    launch file.
+    """
+    # This should be run in a separate process
+    sys.modules["aigis"] = aigis
+    try:
+        launch_mod = mod_utils.import_from_path(fpath)
+        launch_mod.launch(log)
+    except AttributeError:
+        log.error("Cannot find the required function \"launch\" in the file %s", fpath)
+        raise
 
 
 class RequirementError(exc_utils.PluginLoadError):

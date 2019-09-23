@@ -134,7 +134,7 @@ Both internal and external plugins use a required parameter called `LAUNCH`. Whi
 | Option Name          | Required | Type         | Description |
 |:--------------------:|:--------:|:------------:|-------------|
 | LAUNCH (EXTERNAL)    | YES      | list[string] | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. | 
-|LAUNCH (INTERNAL)     | YES      | string      | Internal plugins are launched from a single given function function name. This function *must* have the signature `def function_name(log)`, where `log` will be the logger passed from the centralized logging platform to be used. Anything sent to `stdout` or `stderr` will also automatically be logged using that logger handle. |
+|LAUNCH (INTERNAL)     | YES      | path         | Path to the Python file containing the plugin's launch function. This function __*MUST* have the signature__ `def launch(log)`, where `log` will be the logger passed from the centralized logging platform to be used. Anything sent to `stdout` or `stderr` will also automatically be logged using that logger handle. |
 
 
 ## Config File Perks
