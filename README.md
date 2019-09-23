@@ -92,7 +92,7 @@ While the AIGIS core does not offer any native support for exchanging data betwe
 The config file to place in each plugin's repo shares a common format across all plugin types. It uses a pythonic syntax to assign values to the default parameters it requires. While the format and location are the same, certain extra options may exist depending on the plugin type. This section gives a breakdown of all possible options and in which contexts they are used.
 
 
-__ALL PLUGIN TYPES__
+## ALL PLUGIN TYPES
 
 | Option Name          | Required | Type             | Description |
 |:--------------------:|:--------:|:----------------:|-------------|
@@ -105,28 +105,88 @@ __ALL PLUGIN TYPES__
 | RESTART - __NYI__    | NO       | int              | Number of times to attempt to restart the plugin if it fails. If RESTART is not defined at all, it will never attempt to restart the plugin. Note that this option is available for core plugins, but generally will not make sense as there should be nothing in a core plugin that requires a "restart" or that would make it "crash". |
 
 
-__INTERNAL-LOCAL, INTERNAL-REMOTE AND EXTERNAL PLUGINS__
+## INTERNAL-REMOTE AND EXTERNAL PLUGINS ONLY
 
-| Option Name          | Required | Type             | Description |
-|:--------------------:|:--------:|:----------------:|-------------|
-| LAUNCH               | YES      | list[string]     | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. |
-
-
-__INTERNAL-REMOTE AND EXTERNAL PLUGINS ONLY__
-
-| Option Name          | Required | Type             | Description |
-|:--------------------:|:--------:|:----------------:|-------------|
-| HOST                 | YES      | string           | Host on which to run this plugin. Can be `localhost` if desired, of course. |
+| Option Name | Required | Type    | Description |
+|:-----------:|:--------:|:-------:|-------------|
+| HOST        | YES      | string  | Host on which to run this plugin. Can be `localhost` if desired, of course. |
 
 
+## INTERNAL-LOCAL, INTERNAL-REMOTE AND EXTERNAL PLUGINS
+Both internal and external plugins use a required parameter called `LAUNCH`. While in both cases it represents the programatical starting point of the application, what that is vairies depending on if it's an internal or external plugin.
 
-Internal-local plugins are launched from a single function entrypoint (see internal-local section of __Aigis Config File Options__). This function *must* have the signature  
-`def function_name(log, *args, **kwargs)`  
-Where `log` will be the logger passed from the centralized logging platform to be used. Anything sent to `stdout` or `stderr` will also automatically be logged using that logger handle. `args` and `kwargs` that you might want to pass for a default launch are set up in the AIGIS config file, where the launch function is set (see __Aigis Config File Options__). Any point from this file on can reference anything in AIGIS from a simple `import aigis`, in the same manner as core plugins.
+| Option Name          | Required | Type         | Description |
+|:--------------------:|:--------:|:------------:|-------------|
+| LAUNCH (EXTERNAL)    | YES      | list[string] | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. | 
+|LAUNCH (INTERNAL)     | YES      | string      | Internal plugins are launched from a single given function function name. This function *must* have the signature `def function_name(log)`, where `log` will be the logger passed from the centralized logging platform to be used. Anything sent to `stdout` or `stderr` will also automatically be logged using that logger handle. |
 
 
-A - Aggregation of
-I - Independantly
-G - Governed
-I - Information
+## Config File Perks
+Some extra processing is done on config files in order to offer some quality-of-life improvements when writing config files. These changes are listed below.
+
+### Secret Storage
+Secrets are an important part of securing any application. To avoid having to commit and push hidden files, or perform weird manual manipulations on runtime paths, AIGIS offers a secure, secret distribution method.
+
+Secrets should be placed *on local disk* in the directory `secrets/<plugin_name>` at the *top level* of the AIGIS code, where `<plugin_name>` is the name set in the AIGIS configuration file (found in `config/config.aigis`). These secrets can be copied on runtime to a location within the plugin's source code using the SECRETS config option detailed above.
+
+### {root}
+Plugins are all loaded into a certain place on runtime that isn't necessarily apparent to the config file author. Since many parameters expect path-like entries, the keyword `{root}` is formatted with the local path on disk leading to the plugin. So for example to get to the `src` file of a plugin with an internal structure of `python/AIGIS/src.py`, you can specify `{root}/python/AIGIS/src.py`. This is only done on certain specific configuration options, since many do/should not require it. The supported options for `{root}` are:
+- ENTRYPOINT
+- REQUIREMENTS_FILE
+- SECRETS (only the value, not the key)
+
+
+# Example Config Files
+
+## For Core Plugin
+### AIGIS.config
+```python
+PLUGIN_TYPE = "core"
+ENTRYPOINT = "{root}"
+
+SYSTEM_REQUIREMENTS = ["pip3.7"]
+
+REQUIREMENT_COMMAND = "pip3.7 install --user --index-url https://pypi.python.org/simple -r"
+REQUIREMENT_FILE = "{root}/requirements.txt"
+
+SECRETS = {}
+```
+### AIGIS.core
+```python
+"""
+Define names to export to AIGIS
+"""
+import mymodule.somecode as coolstuff
+
+SKILLS = ["coolstuff.firstcoolthing", "coolstuff.secondcoolthing"]
+```
+
+## For Internal-Local Plugin
+
+## For Internal-Remote Plugin
+
+## For External Plugin
+### AIGIS.config
+```python
+PLUGIN_TYPE = "external"
+ENTRYPOINT = "{root}"
+LAUNCH = ["python36", "main.py"]
+
+SYSTEM_REQUIREMENTS = ["python36", "pip3.6"]
+
+REQUIREMENT_COMMAND = "pip3.6 install -r"
+REQUIREMENT_FILE = "{root}/requirements.txt"
+
+SECRETS = {
+    "my_app_key.secret": "{root}/src/db/",
+    "ip.config": "{root}/src/db/",
+    "connection_token.secret": "{root}/src/db/"
+}
+```
+
+
+A - Aggregation of  
+I - Independantly  
+G - Governed  
+I - Information  
 S - Sources
