@@ -31,7 +31,6 @@ class PluginManager(list):
         :param dict config: the loaded plugins section of the config
         :param LogManager log_manager: the log manager for this AIGIS instance
         """
-        LOG.boot("Downloading configured plugins...")
         for plugin_name in config:
             LOG.info("Loading plugin %s...", plugin_name)
             plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)

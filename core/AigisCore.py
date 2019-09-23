@@ -41,10 +41,13 @@ class Aigis():
         self.plugins = PluginManager()
 
         # Load core plugins
+        LOG.boot("Downloading configured core plugins...")
         self.plugins.load_all(self.config["core"], self.log_manager)
         # Load internal plugins
+        LOG.boot("Downloading configured internal plugins...")
         self.plugins.load_all(self.config["internal"], self.log_manager)
         # Load external plugins
+        LOG.boot("Downloading configured external plugins...")
         self.plugins.load_all(self.config["external"], self.log_manager)
 
     def cleanup(self):

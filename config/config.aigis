@@ -4,9 +4,9 @@
 
 
 [core]
-madbot = "https://github.com/zaltu/mad-bot.git"
+backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 
 [internal]
 
 [external]
-backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
+madbot = "https://github.com/zaltu/mad-bot.git"
