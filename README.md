@@ -93,6 +93,7 @@ The config file to place in each plugin's repo shares a common format across all
 
 
 __ALL PLUGIN TYPES__
+
 | Option Name          | Required | Type             | Description |
 |:--------------------:|:--------:|:----------------:|-------------|
 | PLUGIN_TYPE          | YES      | string           | The plugin's type. Obviously required everywhere. |
@@ -105,12 +106,14 @@ __ALL PLUGIN TYPES__
 
 
 __INTERNAL-LOCAL, INTERNAL-REMOTE AND EXTERNAL PLUGINS__
+
 | Option Name          | Required | Type             | Description |
 |:--------------------:|:--------:|:----------------:|-------------|
 | LAUNCH               | YES      | list[string]     | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. |
 
 
 __INTERNAL-REMOTE AND EXTERNAL PLUGINS ONLY__
+
 | Option Name          | Required | Type             | Description |
 |:--------------------:|:--------:|:----------------:|-------------|
 | HOST                 | YES      | string           | Host on which to run this plugin. Can be `localhost` if desired, of course. |
