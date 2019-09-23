@@ -6,7 +6,7 @@ import subprocess
 
 import pygit2
 
-from utils import path_utils, mod_utils  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
 from plugins import PluginLoader
 from diary.AigisLog import LOG
@@ -38,8 +38,8 @@ class PluginManager(list):
             plugin_config_path = os.path.join(plugin_path, "AIGIS/AIGIS.config")
             try:
                 self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
-            except:  #pylint: disable=bare-except
-                LOG.error("Could not load plugin %s!", plugin_name)
+            except Exception as e:  #pylint: disable=broad-except
+                LOG.error("Could not load plugin %s!\n%s", plugin_name, str(e))
         LOG.boot("All plugins loaded!")
 
     def add_to_core(self, plugin):
@@ -144,7 +144,7 @@ class PluginManager(list):
         """
         try:
             PluginLoader.load(plugin_config, plugin, self)
-        except PluginLoader.PluginLoadError:
+        except exc_utils.PluginLoadError:
             plugin.log.shutdown("Could not load plugin, shutting down...")
             self.dead.append(plugin)
             plugin.cleanup()

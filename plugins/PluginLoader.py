@@ -61,7 +61,7 @@ def contextualize(config, plugin):
     config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
     for secret in config.SECRETS:
         config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
-    if "LAUNCH" in config:  # core plugins do not have launch
+    if config.get("LAUNCH"):  # core plugins do not have launch
         config.LAUNCH = config.LAUNCH.format(root=plugin.root)
 
 
