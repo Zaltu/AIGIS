@@ -1,9 +1,25 @@
+# The AIGIS Config File
+The AIGIS config file is the place to set which plugins should be run by AIGIS when the system is launched. If no plugins are specified here, AIGIS will do pretty much nothing but sleep in the background forever, so make sure everything you want is set up properly if you want something to happen.
+
+The config file is in TOML format, and separated into three parts: core, internal and external. These correspond to the three different types of plugins available to AIGIS (see section below on Plugin Types). Plugins will always be loaded in the order they are listed within their part. The parts are always loaded in the same sequence, that being
+1. core
+2. internal
+3. external
+
+To define a plugin to get picked up by AIGIS, add a new line in the appropriate part. This line represents  
+`plugin_name = plugin_source`  
+Where the plugin name is an internal, AIGIS-only, uniquely identifying name that will be used to refer to that plugin on runtime. The plugin source can be one of two things, either a *public* Github HTTPS clone link (the same one you would use to clone a repo locally over HTTPS), or a path on *local* disk leading to the root of the plugin  __NYI__.
+
+The entire AIGIS runtime is determined by this config file, and it must be specified when running the main AIGIS application by passing it as `-c/--config <path_to_aigis.config>`. While it is techinally possible to run multiple instances of AIGIS independently on the same host, it is generally not recommended to do so, as this could lead to many conflicts and overwritten data sources depending on each plugin's implementation.
+
+
+
 # Plugin Types
 There are three different logically separate types of plugins that Aigis can run. Due to the fundamentally different nature of each of these types, they are implemented in completely different ways. While some cases may have overlap in execution, there should be no code duplication in theory. At least in a perfectly executed build of a plugin graph.
 
 
 # Core Type
-Core plugins refer to purely callable, API like chunks of "dead" code. These may extend the functionality of AIGIS as a whole, or may be extra APIs built around other software, but that do not provide any user-facing functionality on their own. For example, zaltu/backdoorgery is something that could be a core plugin, since it simply offers an interface for another program to run independently.
+Core plugins refer to purely callable, API like chunks of "dead" code. These may extend the functionality of AIGIS as a whole, or may be extra APIs built around other software, but that do not provide any user-facing functionality on their own. For example, `zaltu/backdoorgery` is something that could be a core plugin, since it simply offers an interface for another program to run independently.
 
 It is of paramount importance that core plugins *do not run on their own, or have self-contained daemon-like attributes*, such as threads, multiprocessing or asyncio event loops. This is because these plugins are loaded as part of the central AIGIS process. Any slow-down or processing power taken from the central process will affect all plugin's responsivity, and should be avoided at all costs. For plugins that interact with the core, but have daemon-like attributes, see the "internal" plugin type.
 
@@ -75,7 +91,7 @@ MAX_NAME_LENGTH = aigis.my_database.MAX_NAME_LENGTH()
 3. Limited return types
 If the core function you are calling returns an object that cannot be pickled, an error will be raised. This is because it is nearly impossible to properly mock class instances across python processes, and not supported for many other return types. The number of supported types may increase in the future, but for now you should consult the official list of types supported by the built-in `pickle` module in the python doc. It is up to core plugins to return something that can be pickled, if such calls are expected to come from internal-remote plugins.
 
-#### Why Do It This Way?
+## Why Do It This Way?
 Generally speaking, and as silly as it sounds, this method was chosen so that the syntaxical manner in which the core is accessed remains the same across all plugin types (the `import aigis` syntax). It makes it a lot easier to toggle a plugin's type between internal-local and internal-remote depending on needs or performance issues. It also helps the core potentially optimize internal-remote plugins that happen to be running on the same host as the core, though this is not implemented. The alternative would be in the vein of automatically spinning up a REST API service based on registered core plugins, but this would require much greater core plugin configuration and offer less freedom, along with ultimately still creating a number of downsides, namely requiring an HTTP module like `requests` in each internal-remote plugin and having to standardize return types specifically to JSON or another predetermined format.
 
 
@@ -186,7 +202,13 @@ SECRETS = {
 
 
 A - Aggregation of  
-I - Independantly  
+I - Independently  
 G - Governed  
 I - Information  
 S - Sources
+
+A - Aggregated  
+I - Information  
+G - Governed by  
+I - Independent  
+S - Systems
