@@ -10,6 +10,8 @@ from plugins.core.Skills import Skills
 from diary.LogManager import LogManager
 from diary.LogUtils import LOG
 
+_PLUGIN_TYPES = ["core", "internal-local", "internal-remote", "external"]
+
 class Aigis():
     """
     Did I succeed in protecting everyone?
@@ -40,15 +42,11 @@ class Aigis():
         LOG.boot("Launching plugin manager...")
         self.plugins = PluginManager()
 
-        # Load core plugins
-        LOG.boot("Downloading configured core plugins...")
-        self.plugins.load_all(self.config["core"], self.log_manager)
-        # Load internal plugins
-        LOG.boot("Downloading configured internal plugins...")
-        self.plugins.load_all(self.config["internal"], self.log_manager)
-        # Load external plugins
-        LOG.boot("Downloading configured external plugins...")
-        self.plugins.load_all(self.config["external"], self.log_manager)
+        # Load all plugins in order
+        for ptype in _PLUGIN_TYPES:
+            LOG.boot("Downloading configured %s plugins...", ptype)
+            self.plugins.load_all(self.config[ptype], self.log_manager)
+            LOG.boot("All %s plugins loaded!", ptype)
 
     def cleanup(self):
         """

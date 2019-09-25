@@ -39,7 +39,6 @@ class PluginManager(list):
                 self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
             except Exception as e:  #pylint: disable=broad-except
                 LOG.error("Could not load plugin %s!\n%s", plugin_name, str(e))
-        LOG.boot("All plugins loaded!")
 
     def add_to_core(self, plugin):
         """

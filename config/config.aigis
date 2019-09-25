@@ -1,12 +1,12 @@
 # This is the default config with all features.
 # Pick and choose
 
-
-
 [core]
 backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 
-[internal]
+[internal-local]
+
+[internal-remote]
 
 [external]
 madbot = "https://github.com/zaltu/mad-bot.git"
