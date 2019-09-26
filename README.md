@@ -3,8 +3,9 @@ The AIGIS config file is the place to set which plugins should be run by AIGIS w
 
 The config file is in TOML format, and separated into three parts: core, internal and external. These correspond to the three different types of plugins available to AIGIS (see section below on Plugin Types). Plugins will always be loaded in the order they are listed within their part. The parts are always loaded in the same sequence, that being
 1. core
-2. internal
-3. external
+2. internal-local
+3. internal-remote
+4. external
 
 To define a plugin to get picked up by AIGIS, add a new line in the appropriate part. This line represents  
 `plugin_name = plugin_source`  
