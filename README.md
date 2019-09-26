@@ -13,6 +13,20 @@ Where the plugin name is an internal, AIGIS-only, uniquely identifying name that
 The entire AIGIS runtime is determined by this config file, and it must be specified when running the main AIGIS application by passing it as `-c/--config <path_to_aigis.config>`. While it is techinally possible to run multiple instances of AIGIS independently on the same host, it is generally not recommended to do so, as this could lead to many conflicts and overwritten data sources depending on each plugin's implementation.
 
 
+## Plugin Locations
+Plugins can be pulled from two different locations, a public Github HTTPS clone link or a local directory on disk. There is slightly different behavior in each of these cases.
+
+### Github Source
+When using a source from github, the specified repo is cloned to the "root" of the plugin's runtime location. Essentially the equivalent of a `git clone` in the directory AIGIS uses to store plugins locally on runtime. AIGIS will always clone the *master branch* of the specified repo. If a plugin has already been cloned in the past, AIGIS will recognize this and attempt the equivalent of a `git fetch` on the cloned repo. If for any reason this fetch fails, it *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
+
+### Local Source
+When providing a path to the local source of a plugin, AIGIS will *copy the provided directory* into the plugin's expected runtime location. This is to say that it will __not__ used the location in which the source is provided on runtime. The exact implementation of this is done via `shutil.copytree`, *using default options*. This means symlinks will be followed, permissions will be copied and so on (see the full doc of [shutil.copytree](https://docs.python.org/3.7/library/shutil.html#shutil.copytree) for more info). Should the source already exist in the runtime location, AIGIS will recognize this *and assume the plugin is already present*. Since there is no equivalent function of a `git fetch` for local files, and `shutil.copytree`'s implementation is kinda suck, it will not attempt to update or overwrite the code. This *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
+
+<br>
+**Note that in both cases, to __completely__ reset a plugin, you should remove the directory in its name in the plugin runtime directory, generally under `ext/`*
+
+<br>
+<br>
 
 # Plugin Types
 There are three different logically separate types of plugins that Aigis can run. Due to the fundamentally different nature of each of these types, they are implemented in completely different ways. While some cases may have overlap in execution, there should be no code duplication in theory. At least in a perfectly executed build of a plugin graph.
