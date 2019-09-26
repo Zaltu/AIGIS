@@ -3,6 +3,7 @@ Helper module to hold and organize loaded plugins.
 """
 import os
 import subprocess
+import shutil
 
 import pygit2
 
@@ -154,9 +155,49 @@ class PluginManager(list):
 
 
 
-def download_plugin(plugin, github_path, plugin_path):
+def download_plugin(plugin, source_path, plugin_path):
     """
-    Download a plugin to a local path
+    Put plugin in runtime location by either copying it from a location on disk or cloning it from github.
+
+    :param AigisPlugin plugin: the plugin object
+    :param str source_path: either the path on disk to the plugin source or the github https clone link
+    :param str plugin_path: the path to put the plugin for this runtime
+
+    :returns: if download was successful
+    :rtype: bool
+    """
+    if os.path.exists(source_path):
+        return _local_copy_plugin(plugin, source_path, plugin_path)
+    return _git_download_plugin(plugin, source_path, plugin_path)
+
+
+def _local_copy_plugin(plugin, local_source, plugin_path):
+    """
+    Copy a plugin's source from a location on disk to the runtime plugin path.
+
+    :param AigisPlugin plugin: plugin object
+    :param str local_source: path to copy from
+    :param str plugin_path: path to copy to
+
+    :returns: if instruction was successful
+    :rtype: bool
+    """
+    if os.path.exists(plugin_path):
+        plugin.log.warning("Plugin exists, it will not get updated.")
+        return True
+    try:
+        shutil.copytree(local_source, plugin_path)
+    except Exception as e:  #pylint: disable=broad-except
+        plugin.log.error(
+            "Could not copy files from\n%s to\n%s because\n%s", local_source, plugin_path, str(e)
+        )
+        return False
+    return True
+
+
+def _git_download_plugin(plugin, github_path, plugin_path):
+    """
+    Download a plugin from github to a local path
 
     :param AigisPlugin plugin: plugin object
     :param str github_path: path to download
@@ -165,7 +206,7 @@ def download_plugin(plugin, github_path, plugin_path):
     :returns: if instruction was successful
     :rtype: bool
     """
-    if path_utils.ensure_path_exists(os.path.join(PLUGIN_ROOT_PATH, plugin.name)):
+    if path_utils.ensure_path_exists(plugin_path):
         try:
             plugin.log.info("Plugin already installed, making sure it's up to date...")
             subprocess.check_output(["git", "pull"], cwd=plugin_path)
