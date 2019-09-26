@@ -154,7 +154,6 @@ class PluginManager(list):
         return plugin
 
 
-
 def download_plugin(plugin, source_path, plugin_path):
     """
     Put plugin in runtime location by either copying it from a location on disk or cloning it from github.
