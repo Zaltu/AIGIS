@@ -24,8 +24,8 @@ When using a source from github, the specified repo is cloned to the "root" of t
 When providing a path to the local source of a plugin, AIGIS will *copy the provided directory* into the plugin's expected runtime location. This is to say that it will __not__ used the location in which the source is provided on runtime. The exact implementation of this is done via `shutil.copytree`, *using default options*. This means symlinks will be followed, permissions will be copied and so on (see the full doc of [shutil.copytree](https://docs.python.org/3.7/library/shutil.html#shutil.copytree) for more info). Should the source already exist in the runtime location, AIGIS will recognize this *and assume the plugin is already present*. Since there is no equivalent function of a `git fetch` for local files, and `shutil.copytree`'s implementation is kinda suck, it will not attempt to update or overwrite the code. This *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
 
 <br>
-**Note that in both cases, to __completely__ reset a plugin, you should remove the directory in its name in the plugin runtime directory, generally under `ext/`*
 
+*Note that in both cases, to __completely__ reset a plugin, you should remove the directory in its name in the plugin runtime directory, generally under `ext/`.*
 <br>
 <br>
 
