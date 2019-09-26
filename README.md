@@ -9,7 +9,7 @@ The config file is in TOML format, and separated into three parts: core, interna
 
 To define a plugin to get picked up by AIGIS, add a new line in the appropriate part. This line represents  
 `plugin_name = plugin_source`  
-Where the plugin name is an internal, AIGIS-only, uniquely identifying name that will be used to refer to that plugin on runtime. The plugin source can be one of two things, either a *public* Github HTTPS clone link (the same one you would use to clone a repo locally over HTTPS), or a path on *local* disk leading to the root of the plugin  __NYI__.
+Where the plugin name is an internal, AIGIS-only, uniquely identifying name that will be used to refer to that plugin on runtime. The plugin source can be one of two things, either a *public* Github HTTPS clone link (the same one you would use to clone a repo locally over HTTPS), or a path on *local* disk leading to the root of the plugin.
 
 The entire AIGIS runtime is determined by this config file, and it must be specified when running the main AIGIS application by passing it as `-c/--config <path_to_aigis.config>`. While it is techinally possible to run multiple instances of AIGIS independently on the same host, it is generally not recommended to do so, as this could lead to many conflicts and overwritten data sources depending on each plugin's implementation.
 
