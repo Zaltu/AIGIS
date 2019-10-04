@@ -1,3 +1,28 @@
+# AIGIS
+Welcome to AIGIS  
+```
+A - Artificial
+I - Intelligence
+G - Governing
+I - Independent
+S - Systems
+```
+## Statement of Purpose and Origins
+The goal of AIGIS is to provide a centralized controlling "brain" to act as a link between multiple independently developed systems. In essence, a way of managing the runtimes of multiple programs at once, with centralized information. Based on my experiences, day to day environments tend to slowly become more and more of a spaghettied mess of interdependent relationships over time (technical debt, in a sense). By centralizing the control point of all these dependencies, it becomes much easier to manage missing and otherwise broken dependencies and maintain a clear idea of what is potentially problematic without necessarily needing to keep everything up to date.
+
+It is important to make the distinction between dependency management and runtime management. While AIGIS offers a few tools to flag missing dependencies on bootup, it is the system administrator's responsibility to ensure that all systems are on compatible versions with one another.
+
+AIGIS originated as a means to centralize the monitoring of multiple separately running processes purely because having to regularly double-check a bunch of shells running various independent programs sucks. At it's core, AIGIS was constructed to monitor and provide inter-process services to all these independent systems so that the maintainer would have a simple way to know the state of the environment.
+
+As it progressed, it became apparent that providing more in-depth API services between programs would be hugely beneficial in simplifying the configuration and setup of larger environments. Being able to provide a standard, centralized way of accessing other program's code turned AIGIS into an API service on top of a monitoring one. It's at this point that the concept of "plugins" was formed. Plugins may or may not have dependencies on other plugins, but no matter what requirements it has it does not need to know if or how the dependency is loaded. In fact, the dependency could be a completely differently implemented version of what it expects, but so long as AIGIS can serve the request the plugin won't know.
+
+## Assumption Programming
+AIGIS as a system is partially based on a particular programming style that is centered around assumptions. Mainly, an AIGIS plugin assumes that it can receive and interact with data coming from AIGIS's API services, and assumes the environment is set up correctly for it to receive the correct response. AIGIS assumes that plugins are properly configured and will not cause lag or other undesirable results, and that all dependencies are properly set up by the system administrator. Because of this, any singular plugin can be completely broken without necessarily affecting the rest, unless there's a direct dependency via the AIGIS API service, in which case the result wil depend on just how broken the dependency turns out to be.
+
+## Uses
+Three grand categories encompass all of the functionality AIGIS is meant to handle. The first is monitoring various completely independent processes in a centralized location, which we refer to as external plugins. The second is to provide a centralized API service where plugins can register their functionality and expose it to the whole of AIGIS, which we refer to as core plugins. The last is to provide runtime environments that include this API service to processes running both locally and remotely, which we refer to as internal plugins. A more in-depth breakdown of each plugin type is offered below, as well as how to set them up and used them to their fullest extent.
+
+
 # The AIGIS Config File
 The AIGIS config file is the place to set which plugins should be run by AIGIS when the system is launched. If no plugins are specified here, AIGIS will do pretty much nothing but sleep in the background forever, so make sure everything you want is set up properly if you want something to happen.
 
@@ -215,16 +240,3 @@ SECRETS = {
     "connection_token.secret": "{root}/src/db/"
 }
 ```
-
-
-A - Aggregation of  
-I - Independently  
-G - Governed  
-I - Information  
-S - Sources
-
-A - Aggregated  
-I - Information  
-G - Governed by  
-I - Independent  
-S - Systems
