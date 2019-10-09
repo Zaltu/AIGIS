@@ -3,10 +3,11 @@
 
 [core]
 backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
+dnd = "https://github.com/zaltu/dnd.git"
 
 [internal-local]
+madbot = "https://github.com/zaltu/mad-bot.git"
 
 [internal-remote]
 
 [external]
-madbot = "https://github.com/zaltu/mad-bot.git"
