@@ -4,6 +4,7 @@ Helper module to hold and organize loaded plugins.
 import os
 import subprocess
 import shutil
+import traceback
 
 import pygit2
 
@@ -148,8 +149,8 @@ class PluginManager(list):
             self.dead.append(plugin)
             plugin.cleanup()
             raise
-        except Exception as e:
-            plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", str(e))
+        except Exception:
+            plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", traceback.format_exc())
             raise
         return plugin
 

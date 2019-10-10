@@ -110,6 +110,7 @@ def copy_secrets(config, plugin):
             missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
         for secret in config.SECRETS:
+            path_utils.ensure_path_exists(config.SECRETS[secret])
             shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), config.SECRETS[secret])
     else:
         raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
@@ -157,7 +158,7 @@ def run(config, plugin, manager):
             plugin.log.boot("Internal plugin registered skills...")
         plugin._int_proc = multiprocessing.Process(
             target=_wrap_child_process_launch,
-            args=(plugin.LAUNCH, core_skills, plugin.log)
+            args=(config.LAUNCH, core_skills, plugin.log)
         )
         plugin._int_proc.start()
         Thread(target=_threaded_child_process_wait, args=(plugin, manager)).start()

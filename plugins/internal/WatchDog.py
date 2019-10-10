@@ -20,10 +20,10 @@ def jiiii(plugin, manager):
     :param PluginManager manager: the plugin manager of this AIGIS instance, to bury plugins on death
     """
     # Blocks waiting for OS to recieve correct signal from child process
-    select.select((plugin._int_proc.sentinel), (), ())
+    select.select([plugin._int_proc.sentinel], [], [])
     # However the OS is faster to respond than the propagation of the signal down to the CPython PyObjects,
     # meaning we should still wait for the exitcode to be populated
     while plugin._int_proc.exitcode is None:
         time.sleep(.01)
-    plugin.log.shutdown("Process exited with code %s", plugin._int_proc.returncode)
+    plugin.log.shutdown("Process exited with code %s", plugin._int_proc.exitcode)
     manager.bury(plugin)
