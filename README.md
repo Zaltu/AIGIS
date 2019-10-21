@@ -158,7 +158,7 @@ The config file to place in each plugin's repo shares a common format across all
 | REQUIREMENTS_COMMAND | NO       | string           | Command to run *in shell* of the host to install language/runtime specific requirements. For python, for example, it will generally be some form of `pip install -r` |
 | REQUIREMENTS_FILE    | NO       | path             | File containing list of language-specific package requirements. it is assumed that all languages have a way of loading and installing a list of requirements from a file. |
 | SECRETS              | NO       | map[string:path] | Set of secret files to copy from the central AIGIS secret dump to local environments. |
-| RESTART - __NYI__    | NO       | int              | Number of times to attempt to restart the plugin if it fails. If RESTART is not defined at all, it will never attempt to restart the plugin. Note that this option is available for core plugins, but generally will not make sense as there should be nothing in a core plugin that requires a "restart" or that would make it "crash". |
+| RESTART              | NO       | int              | Number of times to attempt to restart the plugin if it fails. If RESTART is not defined at all, it will never attempt to restart the plugin. Note that this option is available for core plugins, but generally will not make sense as there should be nothing in a core plugin that requires a "restart" or that would make it "crash". |
 
 
 ## INTERNAL-REMOTE AND EXTERNAL PLUGINS ONLY
