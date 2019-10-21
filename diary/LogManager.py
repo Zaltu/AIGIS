@@ -1,9 +1,13 @@
 """
 Module for the Log Management class
 """
+import os
+import shutil
 import logging
+from datetime import datetime
 from diary.AigisLog import AigisLogger
-from diary.LogUtils import _add_log_handlers, CORE_LOG_LOCATION, LOG
+from diary.LogUtils import _add_log_handlers, LOG_LOCATION, LOG
+from utils import path_utils  #pylint: disable=no-name-in-module
 
 class LogManager():
     """
@@ -26,21 +30,6 @@ class LogManager():
             return self.loggers[plugin.id]
         return None
 
-    def getCoreLogger(self, corename):
-        """
-        Fetch a logger to be used for a core module.
-
-        :param str corename: name of the core module. Generally module.__name__
-
-        :returns: configured python logger
-        :rtype: logging.logger
-        """
-        if corename in self.loggers:
-            return self.loggers[corename]
-        self.loggers[corename] = logging.getLogger(corename)
-        _add_log_handlers(self.loggers[corename], CORE_LOG_LOCATION.format(corename=corename))
-        return self.loggers[corename]
-
     def hook(self, plugin):
         """
         Generate an AigisLogger object to be used to hook into a plugin's output.
@@ -62,3 +51,14 @@ class LogManager():
         LOG.shutdown("Cleaning up registered loggers...")
         for logger in self.loggers:
             self.loggers[logger].cleanup()
+
+        LOG.shutdown("Backing up logs to timestamped dir...")
+        log_dump_dir = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../",
+                datetime.now().strftime("%Y-%m-%d_%X")
+            )
+        )
+        path_utils.ensure_path_exists(log_dump_dir)
+        shutil.move(LOG_LOCATION, log_dump_dir)

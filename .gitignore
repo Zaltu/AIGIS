@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 
-# Ignore logging folder
+# Ignore logging folders
 log/
 
 # Ignore downloaded extensions

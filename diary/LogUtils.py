@@ -5,7 +5,7 @@ import os
 import sys
 import logging
 
-from utils.path_utils import ensure_file_exists  #pylint: disable=no-name-in-module
+from utils import path_utils  #pylint: disable=no-name-in-module
 
 def _plugin_file_name(plugin):
     """
@@ -30,7 +30,7 @@ def _add_log_handlers(logger, logfile):
     :param logging.logger logger: the logger to configure
     :param str logfile: file to log to disk
     """
-    ensure_file_exists(logfile)
+    path_utils.ensure_file_exists(logfile)
     logger.setLevel(logging.INFO)
     fh = logging.FileHandler(logfile)
     fh.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
@@ -59,16 +59,15 @@ def shutdown(self, message, *args, **kws):  #pylint: disable=missing-docstring
 logging.Logger.shutdown = shutdown
 
 
-PLUGIN_LOG_LOCATION = os.path.join(os.path.dirname(__file__), "../log/plugins/")
-CORE_LOG_LOCATION = os.path.join(os.path.dirname(__file__), "../log/{corename}.log")
-
+LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
+PLUGIN_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/plugins/"))
+#CORE_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/{corename}.log"))
+path_utils.ensure_path_exists(LOG_LOCATION)
+path_utils.ensure_path_exists(PLUGIN_LOG_LOCATION)
+#path_utils.ensure_file_exists(CORE_LOG_LOCATION)
 
 _SH = logging.StreamHandler(sys.stdout)
 _SH.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
-
-
-if not os.path.exists(os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))):
-    os.mkdir(os.path.abspath(os.path.join(os.path.dirname(__file__), "../log")))
 
 
 LOG = logging.getLogger("AIGIS")
