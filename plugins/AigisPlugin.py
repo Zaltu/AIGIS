@@ -9,14 +9,16 @@ class AigisPlugin():
     :param str name: name of the plugin
     :param str root: root path of the plugin
     :param str ptype: the plugin type
+    :param bool restart: whether an auto-restart should be attempted on death
     :param object config: the plugin's config namespace
     :param LogManager log_manager: the log manager for this AIGIS instance
     """
-    def __init__(self, name, root, log_manager, ptype=None, config=None):
+    def __init__(self, name, root, log_manager, ptype=None, restart=False, config=None):
         self.id = id(self)
         self.name = name
         self.root = root
         self.type = ptype
+        self.restart = restart
         self.config = config
         self.log = log_manager.hook(self)
         self.log.boot("Registered plugin...")
