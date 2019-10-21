@@ -219,6 +219,20 @@ SKILLS = ["coolstuff.firstcoolthing", "coolstuff.secondcoolthing"]
 ```
 
 ## For Internal-Local Plugin
+```python
+PLUGIN_TYPE = "internal-local"
+ENTRYPOINT = "{root}"
+LAUNCH = "{root}/main.py"
+
+SYSTEM_REQUIREMENTS = ["pip3.7"]
+
+REQUIREMENT_COMMAND = "pip3.7 install -r"
+REQUIREMENT_FILE = "{root}/requirements.txt"
+
+SECRETS = {
+    ".secrets.toml": "{root}/src/db/",
+}
+```
 
 ## For Internal-Remote Plugin
 
