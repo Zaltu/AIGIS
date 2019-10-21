@@ -3,10 +3,9 @@ Module for the Log Management class
 """
 import os
 import shutil
-import logging
 from datetime import datetime
 from diary.AigisLog import AigisLogger
-from diary.LogUtils import _add_log_handlers, LOG_LOCATION, LOG
+from diary.LogUtils import LOG_LOCATION, LOG
 from utils import path_utils  #pylint: disable=no-name-in-module
 
 class LogManager():

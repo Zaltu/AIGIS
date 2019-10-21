@@ -61,10 +61,8 @@ logging.Logger.shutdown = shutdown
 
 LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
 PLUGIN_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/plugins/"))
-#CORE_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/{corename}.log"))
 path_utils.ensure_path_exists(LOG_LOCATION)
 path_utils.ensure_path_exists(PLUGIN_LOG_LOCATION)
-#path_utils.ensure_file_exists(CORE_LOG_LOCATION)
 
 _SH = logging.StreamHandler(sys.stdout)
 _SH.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
