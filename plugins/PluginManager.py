@@ -66,6 +66,11 @@ class PluginManager(list):
 
         :param AigisPlugin plugin: dead plugin to bury
         """
+        if plugin.restart:
+            plugin.log.info("Attempting to restart plugin...")
+            self._aigisplugin_load_wrapper(plugin)
+            return
+
         if plugin in self:
             self.dead.append(self.pop(self.index(plugin)))
             plugin.cleanup()
@@ -124,17 +129,18 @@ class PluginManager(list):
 
         # VERY IMPORTANT
         plugin.type = plugin_config.PLUGIN_TYPE
+        plugin.restart = getattr(plugin_config, "RESTART", False)
+        plugin.config = plugin_config
 
         plugin.log.boot("Preparing to launch...")
-        self.append(self._aigisplugin_load_wrapper(plugin, plugin_config))
+        self.append(self._aigisplugin_load_wrapper(plugin))
 
 
-    def _aigisplugin_load_wrapper(self, plugin, plugin_config):
+    def _aigisplugin_load_wrapper(self, plugin):
         """
         Specifically load the plugin.
 
         :param AigisPlugin plugin: the plugin object
-        :param str plugin_config: plugin config module
 
         :returns: plugin object
         :rtype: AigisPlugin
@@ -143,7 +149,7 @@ class PluginManager(list):
         :raises Exception: for any other system errors preventing the plugin from being launched.
         """
         try:
-            PluginLoader.load(plugin_config, plugin, self)
+            PluginLoader.load(plugin, self)
         except exc_utils.PluginLoadError:
             plugin.log.shutdown("Could not load plugin, shutting down...")
             self.dead.append(plugin)

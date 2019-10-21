@@ -9,13 +9,15 @@ class AigisPlugin():
     :param str name: name of the plugin
     :param str root: root path of the plugin
     :param str ptype: the plugin type
+    :param object config: the plugin's config namespace
     :param LogManager log_manager: the log manager for this AIGIS instance
     """
-    def __init__(self, name, root, log_manager, ptype=None):
+    def __init__(self, name, root, log_manager, ptype=None, config=None):
         self.id = id(self)
         self.name = name
         self.root = root
         self.type = ptype
+        self.config = config
         self.log = log_manager.hook(self)
         self.log.boot("Registered plugin...")
 

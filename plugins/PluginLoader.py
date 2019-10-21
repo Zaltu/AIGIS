@@ -23,7 +23,7 @@ if os.name == "nt":
 else:
     ALOOP = asyncio.get_event_loop()
 
-def load(config, plugin, manager):
+def load(plugin, manager):
     """
     Set up the AIGIS plugin. This means executing the four major steps.
     CONTEXTUALIZE
@@ -31,112 +31,107 @@ def load(config, plugin, manager):
     SECRETS
     RUN
 
-    :param module config: the config module for this plugin
     :param AigisPlugin plugin: the plugin stored in core, regardless of plugin type.
     :param PluginManager manager: this instance's PluginManager
 
     :raises PluginLoadError: for any problem in loading the plugin
     """
     try:
-        contextualize(config, plugin)
-        requirements(config, plugin)
-        copy_secrets(config, plugin)
+        contextualize(plugin)
+        requirements(plugin)
+        copy_secrets(plugin)
         plugin.log.boot("Ready for deployment...")
-        run(config, plugin, manager)
+        run(plugin, manager)
     except exc_utils.PluginLoadError as e:
         plugin.log.error(str(e))
         raise
 
 
-def contextualize(config, plugin):
+def contextualize(plugin):
     """
     Apply any plugin contextualization that could be needed to the config,
     depending on numerous factors.
     This is kind of silly, but I'm not sure how to make it better.
 
-    :param module config: this plugin's config
     :param AigisPlugin plugin: the plugin stored in core
     """
-    config.ENTRYPOINT = config.ENTRYPOINT.format(root=plugin.root)
-    config.REQUIREMENT_FILE = config.REQUIREMENT_FILE.format(root=plugin.root)
-    for secret in config.SECRETS:
-        config.SECRETS[secret] = config.SECRETS[secret].format(root=plugin.root)
+    plugin.config.ENTRYPOINT = plugin.config.ENTRYPOINT.format(root=plugin.root)
+    plugin.config.REQUIREMENT_FILE = plugin.config.REQUIREMENT_FILE.format(root=plugin.root)
+    for secret in plugin.config.SECRETS:
+        plugin.config.SECRETS[secret] = plugin.config.SECRETS[secret].format(root=plugin.root)
     if "internal" in plugin.type:  # launch is only a path on internal plugins
-        config.LAUNCH = config.LAUNCH.format(root=plugin.root)
+        plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
 
 
-def requirements(config, plugin):
+def requirements(plugin):
     """
     Install the requirements for this plugin on the host system, based on the plugin config.
 
-    :param module config: config module for this plugin
     :param AigisPlugin plugin: the plugin stored in core
 
     :raises RequirementError: if requirements are not or cannot be met.
     """
     # Check system requirements
-    for req in config.SYSTEM_REQUIREMENTS:
+    for req in plugin.config.SYSTEM_REQUIREMENTS:
         try:
             assert shutil.which(req)
         except AssertionError:
             raise RequirementError("Fatal error. Host has no %s installed." % req)
 
     try:
-        output = os.system(" ".join([config.REQUIREMENT_COMMAND, config.REQUIREMENT_FILE]))
+        output = os.system(" ".join([plugin.config.REQUIREMENT_COMMAND, plugin.config.REQUIREMENT_FILE]))
         if output != 0:
             raise RequirementError("Requirement install exited with error code %s" % output)
     except Exception as e:
         raise RequirementError(
             "Could not process requirements %s. The following error occured:\n%s" %
-            (config.REQUIREMENT_FILE, str(e))
+            (plugin.config.REQUIREMENT_FILE, str(e))
         )
 
     plugin.log.boot("Requirements processed successfully...")
 
 
-def copy_secrets(config, plugin):
+def copy_secrets(plugin):
     """
     Copy any potential secrets a plugin could have from the AIGIS secret dump to the specified location.
     Will not copy anything is a file is missing.
 
-    :param module config: config module for this plugin
     :param AigisPlugin plugin: plugin registered in core
 
     :raises MissingSecretFileError: if a specified secret cannot be found.
     """
     missing_secrets = []
-    for secret in config.SECRETS:
+    for secret in plugin.config.SECRETS:
         if not os.path.exists(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret))):
             missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
-        for secret in config.SECRETS:
-            path_utils.ensure_path_exists(config.SECRETS[secret])
-            shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), config.SECRETS[secret])
+        for secret in plugin.config.SECRETS:
+            path_utils.ensure_path_exists(plugin.config.SECRETS[secret])
+            shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), plugin.config.SECRETS[secret])
     else:
         raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
 
 
-def run(config, plugin, manager):
+def run(plugin, manager):
     """
     This function launches the plugin following different logic depending on the plugin type
     specified in the config.
 
-    :param module config: config module for this plugin
     :param AigisPlugin plugin: plugin to be passed to the WatchDog for external processes
     :param PluginManager manager: this instance's PluginManager to be passed to the WatchDog
     for external processes
 
     :raises InvalidPluginTypeError: if the plugin type specified in the plugin config is not valid
     """
-    if config.PLUGIN_TYPE == "external":
-        ALOOP.run_until_complete(_run_external(config, plugin))
+    if plugin.config.PLUGIN_TYPE == "external":
+        ALOOP.run_until_complete(_run_external(plugin))
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
-    elif config.PLUGIN_TYPE == "core":
+    elif plugin.config.PLUGIN_TYPE == "core":
         import aigis as core_skills # AigisCore.skills
         # We need to add the plugin config's entrypoint to the PYTHONPATH
         # so imports work as expected on requirements
-        sys.path.append(config.ENTRYPOINT)
+        sys.path.append(plugin.config.ENTRYPOINT)
         core_skills._AIGISlearnskill(
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin)
@@ -144,11 +139,11 @@ def run(config, plugin, manager):
             plugin.log
         )
         plugin.log.boot("Skills acquired.")
-    elif config.PLUGIN_TYPE == "internal-local":
+    elif plugin.config.PLUGIN_TYPE == "internal-local":
         import aigis as core_skills # AigisCore.skills
         # We need to add the plugin config's entrypoint to the PYTHONPATH
         # so imports work as expected on requirements
-        sys.path.append(config.ENTRYPOINT)
+        sys.path.append(plugin.config.ENTRYPOINT)
         core_file = _prep_core_injector_file(plugin)
         if core_file:
             core_skills._AIGISlearnskill(
@@ -158,19 +153,21 @@ def run(config, plugin, manager):
             plugin.log.boot("Internal plugin registered skills...")
         plugin._int_proc = multiprocessing.Process(
             target=_wrap_child_process_launch,
-            args=(config.LAUNCH, core_skills, plugin.log)
+            args=(plugin.config.LAUNCH, core_skills, plugin.log)
         )
         plugin._int_proc.start()
         Thread(target=_threaded_child_process_wait, args=(plugin, manager)).start()
     else:
-        raise InvalidPluginTypeError("Cannot process plugin type %s." % config.PLUGIN_TYPE)
+        raise InvalidPluginTypeError("Cannot process plugin type %s." % plugin.config.PLUGIN_TYPE)
 
 
-async def _run_external(config, plugin):
+async def _run_external(plugin):
     """
     Launch an asyncio subprocess.
+
+    :param AigisPlugin plugin: the plugin
     """
-    plugin._ext_proc = await asyncio.create_subprocess_exec(*config.LAUNCH, cwd=config.ENTRYPOINT)
+    plugin._ext_proc = await asyncio.create_subprocess_exec(*plugin.config.LAUNCH, cwd=plugin.config.ENTRYPOINT)
 
 
 def _threaded_async_process_wait(plugin, manager):
