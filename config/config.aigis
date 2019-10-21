@@ -6,7 +6,7 @@ backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 dnd = "https://github.com/zaltu/dnd-utils.git"
 
 [internal-local]
-#madbot = "https://github.com/zaltu/mad-bot.git"
+madbot = "https://github.com/zaltu/mad-bot.git"
 
 [internal-remote]
 
