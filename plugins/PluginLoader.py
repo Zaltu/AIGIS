@@ -57,7 +57,7 @@ def contextualize(plugin):
     """
     plugin.config.ENTRYPOINT = plugin.config.ENTRYPOINT.format(root=plugin.root)
     plugin.config.REQUIREMENT_FILE = plugin.config.REQUIREMENT_FILE.format(root=plugin.root)
-    for secret in plugin.config.SECRETS:
+    for secret in getattr(plugin.config, "SECRETS", {}):
         plugin.config.SECRETS[secret] = plugin.config.SECRETS[secret].format(root=plugin.root)
     if "internal" in plugin.type:  # launch is only a path on internal plugins
         plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
