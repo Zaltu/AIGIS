@@ -10,17 +10,22 @@ class Skills():
     Only a single instance of this class should be made, and the private functions it exposes
     (_AIGISlearnskill and _AIGISrecurdict) should only be called by the core AIGIS code.
     """
-    def _AIGISlearnskill(self, mod, log):
+    def _AIGISlearnskill(self, mod, plugin):
         """
         Join a given dict with this class' dict, essentially extending the functionality of the class.
 
         :param module mod: module who's functionality to port
-        :param logging.logger log: this AigisPlugin's logger
+        :param AigisPlugin plugin: this AigisPlugin
         """
         for name in mod.SKILLS:
             pseq = name.split(".")
-            self._AIGISrecurdict(mod, pseq, 0, self, log)
-            log.boot("Registered %s...", name)
+            self._AIGISrecurdict(mod, pseq, 0, self, plugin.log)
+            plugin.log.boot("Registered %s...", name)
+
+        # If the core plugin has exposed a way to perform a cleanup of it's resources, mark that in the
+        # AigisPlugin to be called on program exit.
+        if hasattr(mod, "cleanup"):
+            plugin.cleanup = mod.cleanup
 
     def _AIGISrecurdict(self, mod, pseq, i, ns, log):
         """

@@ -142,7 +142,7 @@ def run(plugin, manager):
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin)
             ),
-            plugin.log
+            plugin
         )
         plugin.log.boot("Skills acquired.")
     elif plugin.config.PLUGIN_TYPE == "internal-local":
