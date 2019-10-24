@@ -5,7 +5,7 @@ that pipe their outputs to the core.
 import logging
 from collections import deque
 
-from diary.LogUtils import _add_log_handlers, _plugin_file_name, LOG
+from utils.log_utils import _add_log_handlers, _plugin_file_name, LOG  #pylint: disable=no-name-in-module
 
 
 class AigisLogger(logging.getLoggerClass()):

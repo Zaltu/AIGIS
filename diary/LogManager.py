@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from diary.AigisLog import AigisLogger
-from diary.LogUtils import LOG
+from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 from utils import path_utils  #pylint: disable=no-name-in-module
 
 class LogManager():

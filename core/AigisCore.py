@@ -8,7 +8,7 @@ import toml
 from plugins.PluginManager import PluginManager
 from plugins.core.Skills import Skills
 from diary.LogManager import LogManager
-from diary.LogUtils import LOG
+from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 
 _PLUGIN_TYPES = ["core", "internal-local", "internal-remote", "external"]
 
