@@ -192,6 +192,9 @@ Plugins are all loaded into a certain place on runtime that isn't necessarily ap
 - SECRETS (only the value, not the key)
 - LAUNCH (applicable for internal plugins)
 
+### `cleanup`
+Certain plugins may understandably have some more complex resources loaded in order to provide more complex services. In this case, it's important to be able to specify a certain way of liberating these resources in the event that AIGIS is shut down while these resources are in use. To do this, a special keyword is processed when loading *core* functionalities (from both core plugins and internal-local plugins with core hooks). That keyword is `cleanup`. When a core file defines the skill `cleanup`, the value will be registered internally to the AIGIS system and called on program exit. If it does not exist, no cleanup will be done outside the usual Python resource closure. Note that cleanup is expected to be a function and will be *called* on exit. Test these function thoroughly, as their failure may have serious unwanted effects.
+
 
 # Example Config Files
 
