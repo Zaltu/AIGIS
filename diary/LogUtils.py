@@ -18,7 +18,7 @@ def _plugin_file_name(plugin):
     """
     return os.path.abspath(
         os.path.join(
-            PLUGIN_LOG_LOCATION,
+            path_utils.PLUGIN_LOG_LOCATION,
             "_".join([plugin.name, str(plugin.id)]) + ".log")
     )
 
@@ -59,10 +59,9 @@ def shutdown(self, message, *args, **kws):  #pylint: disable=missing-docstring
 logging.Logger.shutdown = shutdown
 
 
-LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
-PLUGIN_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/plugins/"))
-path_utils.ensure_path_exists(LOG_LOCATION)
-path_utils.ensure_path_exists(PLUGIN_LOG_LOCATION)
+path_utils.ensure_path_exists(path_utils.LOG_LOCATION)
+path_utils.ensure_path_exists(path_utils.PLUGIN_LOG_LOCATION)
+
 
 _SH = logging.StreamHandler(sys.stdout)
 _SH.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))

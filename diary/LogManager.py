@@ -5,7 +5,7 @@ import os
 import shutil
 from datetime import datetime
 from diary.AigisLog import AigisLogger
-from diary.LogUtils import LOG_LOCATION, LOG
+from diary.LogUtils import LOG
 from utils import path_utils  #pylint: disable=no-name-in-module
 
 class LogManager():
@@ -60,4 +60,4 @@ class LogManager():
             )
         )
         path_utils.ensure_path_exists(log_dump_dir)
-        shutil.move(LOG_LOCATION, log_dump_dir)
+        shutil.move(path_utils.LOG_LOCATION, log_dump_dir)

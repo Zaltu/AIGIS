@@ -3,6 +3,14 @@ Container file for path management utilities.
 """
 import os
 
+# Constant paths
+# Plugins
+PLUGIN_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../ext"))
+SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
+# Logging
+LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
+PLUGIN_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/plugins/"))
+
 def ensure_path_exists(path):
     """
     If provided path does not exist, create it.

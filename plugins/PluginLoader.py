@@ -13,8 +13,7 @@ from plugins.external.WatchDog import jiii
 from plugins.internal.WatchDog import jiiii  # 2smug
 
 # Set the dump location for plugin secrets
-SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
-path_utils.ensure_path_exists(SECRET_DUMP)
+path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
@@ -102,14 +101,14 @@ def copy_secrets(plugin):
     """
     missing_secrets = []
     for secret in plugin.config.SECRETS:
-        if not os.path.exists(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret))):
-            missing_secrets.append(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)))
+        if not os.path.exists(os.path.join(path_utils.SECRET_DUMP, os.path.join(plugin.name, secret))):
+            missing_secrets.append(os.path.join(path_utils.SECRET_DUMP, os.path.join(plugin.name, secret)))
     if not missing_secrets:
         for secret in plugin.config.SECRETS:
             path_utils.ensure_path_exists(plugin.config.SECRETS[secret])
             shutil.copy2(
                 os.path.join(
-                    SECRET_DUMP,
+                    path_utils.SECRET_DUMP,
                     os.path.join(plugin.name, secret)
                 ),
                 plugin.config.SECRETS[secret]

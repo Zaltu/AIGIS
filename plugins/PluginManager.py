@@ -8,23 +8,19 @@ import traceback
 
 import pygit2
 
-from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
+from utils import path_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
 from plugins import PluginLoader
 from diary.AigisLog import LOG
-
-PLUGIN_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../ext"))
 
 class PluginManager(list):
     """
     Helper class to hold and organize loaded plugins.
     """
-    core = []
-    external = []
     dead = []
     def __init__(self):
         super().__init__(self)
-        path_utils.ensure_path_exists(PLUGIN_ROOT_PATH)
+        path_utils.ensure_path_exists(path_utils.PLUGIN_ROOT_PATH)
 
     def load_all(self, config, log_manager):
         """
@@ -35,30 +31,10 @@ class PluginManager(list):
         """
         for plugin_name in config:
             LOG.info("Loading plugin %s...", plugin_name)
-            plugin_path = os.path.join(PLUGIN_ROOT_PATH, plugin_name)
-            plugin_config_path = os.path.join(plugin_path, "AIGIS/AIGIS.config")
             try:
-                self._load_one(plugin_name, plugin_path, plugin_config_path, log_manager, config[plugin_name])
+                self._load_one(plugin_name, log_manager, config[plugin_name])
             except Exception as e:  #pylint: disable=broad-except
                 LOG.error("Could not load plugin %s!\n%s", plugin_name, str(e))
-
-    def add_to_core(self, plugin):
-        """
-        Add an AigisPlugin to this list, but also to the core list.
-
-        :param AigisPlugin plugin: plugin object to add
-        """
-        self.core.append(plugin)
-        self.append(plugin)
-
-    def add_to_external(self, plugin):
-        """
-        Add an AigisPlugin to this list, but also to the core list.
-
-        :param AigisPlugin plugin: plugin object to add
-        """
-        self.external.append(plugin)
-        self.append(plugin)
 
     def bury(self, plugin):
         """
@@ -73,13 +49,7 @@ class PluginManager(list):
 
         if plugin in self:
             self.dead.append(self.pop(self.index(plugin)))
-            plugin.cleanup()
-
-            if plugin in self.core:
-                self.core.remove(plugin)
-
-            if plugin in self.external:
-                self.external.remove(plugin)
+            safe_cleanup(plugin)
 
         plugin.log.shutdown("Plugin shut down.")
         LOG.warning("%s has terminated.", plugin.name)
@@ -90,12 +60,9 @@ class PluginManager(list):
         """
         LOG.shutdown("Requesting plugins clean themselves up.")
         for plugin in self:
-            try:
-                plugin.cleanup()
-            except:  #pylint: disable=bare-except
-                LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
+            safe_cleanup(plugin)
 
-    def _load_one(self, plugin_name, plugin_path, plugin_config_path, log_manager, plugin_url):
+    def _load_one(self, plugin_name, log_manager, plugin_url):
         """
         Fully load one plugin. This includes
         - generating the AigisPlugin object (with logger)
@@ -107,59 +74,33 @@ class PluginManager(list):
         In any case of error loading the plugin, an exception will be raised.
 
         :param str plugin_name: name of plugin to load
-        :param str plugin_path: local path the plugin should reside in
-        :param str plugin_config_path: path to the local AIGIS-compatible config file for this plugin
         :param LogManager log_manager: the AIGIS LogManager singleton for this execution
         :param str plugin_url: web URL from which to download the plugin
 
         :raises FileNotFoundError: explicitely if the config file cannot be found locally once the plugin
         has been downloaded
-        :raises Exeption: numerous exception types can be bubbled up from the various loading mechanisms
+        :raises Exception: numerous exception types can be bubbled up from the various loading mechanisms
         """
-        plugin = AigisPlugin(plugin_name, plugin_path, log_manager)
+        plugin = AigisPlugin(plugin_name, log_manager)
 
         plugin.log.boot("Downloading plugin...")
-        if not download_plugin(plugin, plugin_url, plugin_path):
+        if not download_plugin(plugin, plugin_url, plugin.root):
             return
 
-        plugin.log.boot("Getting config...")
-        try:
-            plugin_config = mod_utils.import_from_path(plugin_config_path)
-        except FileNotFoundError as e:
-            plugin.log.error(str(e))
-            plugin.log.shutdown("Could not get configuration for plugin %s!", plugin.name)
-            raise
-
-        # VERY IMPORTANT
-        _config_plugin_extra(plugin, plugin_config)
+        plugin.configure()
 
         plugin.log.boot("Preparing to launch...")
-        self.append(self._aigisplugin_load_wrapper(plugin))
-
-
-    def _aigisplugin_load_wrapper(self, plugin):
-        """
-        Specifically load the plugin.
-
-        :param AigisPlugin plugin: the plugin object
-
-        :returns: plugin object
-        :rtype: AigisPlugin
-
-        :raises PluginLoadError: for any error occurring while trying to launch the plugin
-        :raises Exception: for any other system errors preventing the plugin from being launched.
-        """
         try:
             PluginLoader.load(plugin, self)
-        except exc_utils.PluginLoadError:
-            plugin.log.shutdown("Could not load plugin, shutting down...")
+            self.append(plugin)
+        except Exception as e:
+            if isinstance(e, exc_utils.PluginLoadError):
+                plugin.log.shutdown("Could not load plugin, shutting down...")
+            else:
+                plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", traceback.format_exc())
             self.dead.append(plugin)
-            plugin.cleanup()
+            safe_cleanup(plugin)
             raise
-        except Exception:
-            plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", traceback.format_exc())
-            raise
-        return plugin
 
 
 def download_plugin(plugin, source_path, plugin_path):
@@ -238,16 +179,15 @@ def _download(url, plugin_path):
     pygit2.clone_repository(url, plugin_path, checkout_branch="master")
 
 
-def _config_plugin_extra(plugin, plugin_config):
+def safe_cleanup(plugin):
     """
-    Perform some confiuration on the plugin and config so all entries contain some standardized information.
-    This should probably all be moved to AigisPlugin, including all the config load logic.
+    Clean up a plugin in a safe way by catching errors.
+    Still log those errors as they are though. This is just so AIGIS doesn't crash, since that would be very
+    bad.
 
-    :param AigisPlugin plugin: plugin to configure
-    :param object plugin_config: this plugin's config
+    :param AigisPlugin plugin: plugin to clean up
     """
-    plugin.type = plugin_config.PLUGIN_TYPE
-    plugin.restart = getattr(plugin_config, "RESTART", False)
-    plugin.config = plugin_config
-    if not hasattr(plugin.config, "SECRETS"):
-        setattr(plugin.config, "SECRETS", {})
+    try:
+        plugin.cleanup()
+    except:  #pylint: disable=bare-except
+        LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)

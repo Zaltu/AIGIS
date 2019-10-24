@@ -1,24 +1,26 @@
 """
 Representation of a plugin with handlers used by the core to properly route traffic.
 """
+import os
+from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
 
 class AigisPlugin():
     """
     A plugin that can be managed by AIGIS and it's core.
 
     :param str name: name of the plugin
-    :param str root: root path of the plugin
     :param str ptype: the plugin type
     :param bool restart: whether an auto-restart should be attempted on death
     :param object config: the plugin's config namespace
     :param LogManager log_manager: the log manager for this AIGIS instance
     """
-    def __init__(self, name, root, log_manager, ptype=None, restart=False, config=None):
+    def __init__(self, name, log_manager, ptype=None, restart=False, config=None):
         self.id = id(self)
         self.name = name
-        self.root = root
         self.type = ptype
         self.restart = restart
+        self.root = os.path.join(path_utils.PLUGIN_ROOT_PATH, self.name)
+        self.config_path = os.path.join(self.root, "AIGIS/AIGIS.config")
         self.config = config
         self.log = log_manager.hook(self)
         self.log.boot("Registered plugin...")
@@ -38,6 +40,27 @@ class AigisPlugin():
         except AttributeError:
             pass
         return False
+
+    def configure(self):
+        """
+        Load the configuration object and configure the plugin accordingly. This step is essential and
+        plugins should never be launched without first being configured. It will crash.
+
+        :raises FileNotFoundError: if the config file cannot be found
+        """
+        self.log.boot("Getting config...")
+        try:
+            self.config = mod_utils.import_from_path(self.config_path)
+        except FileNotFoundError as e:
+            self.log.error(str(e))
+            self.log.shutdown("Could not get configuration for plugin %s!", self.name)
+            raise
+
+        # VERY IMPORTANT
+        self.type = self.config.PLUGIN_TYPE
+        self.restart = getattr(self.config, "RESTART", False)
+        if not hasattr(self.config, "SECRETS"):
+            setattr(self.config, "SECRETS", {})
 
     def cleanup(self):
         """
