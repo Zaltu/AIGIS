@@ -5,6 +5,7 @@ import os
 import sys
 import shutil
 import asyncio
+import subprocess
 import multiprocessing
 from threading import Thread
 from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
@@ -16,12 +17,7 @@ SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__
 path_utils.ensure_path_exists(SECRET_DUMP)
 
 # Get asyncio event loop for subprocess management
-# FUCKING WINDOWS REEEEEEEE
-if os.name == "nt":
-    ALOOP = asyncio.ProactorEventLoop()
-    asyncio.set_event_loop(ALOOP)
-else:
-    ALOOP = asyncio.get_event_loop()
+ALOOP = asyncio.get_event_loop()
 
 def load(plugin, manager):
     """
@@ -40,7 +36,7 @@ def load(plugin, manager):
         contextualize(plugin)
         requirements(plugin)
         copy_secrets(plugin)
-        plugin.log.boot("Ready for deployment...")
+        plugin.log.boot("Deploying...")
         run(plugin, manager)
     except exc_utils.PluginLoadError as e:
         plugin.log.error(str(e))
@@ -57,7 +53,7 @@ def contextualize(plugin):
     """
     plugin.config.ENTRYPOINT = plugin.config.ENTRYPOINT.format(root=plugin.root)
     plugin.config.REQUIREMENT_FILE = plugin.config.REQUIREMENT_FILE.format(root=plugin.root)
-    for secret in getattr(plugin.config, "SECRETS", {}):
+    for secret in plugin.config.SECRETS:
         plugin.config.SECRETS[secret] = plugin.config.SECRETS[secret].format(root=plugin.root)
     if "internal" in plugin.type:  # launch is only a path on internal plugins
         plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
@@ -79,9 +75,13 @@ def requirements(plugin):
             raise RequirementError("Fatal error. Host has no %s installed." % req)
 
     try:
-        output = os.system(" ".join([plugin.config.REQUIREMENT_COMMAND, plugin.config.REQUIREMENT_FILE]))
-        if output != 0:
-            raise RequirementError("Requirement install exited with error code %s" % output)
+        subprocess.check_call(
+            plugin.config.REQUIREMENT_COMMAND.split(" ") + [plugin.config.REQUIREMENT_FILE],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except subprocess.CalledProcessError as e:
+        raise RequirementError("Requirement install exited with error code %s" % str(e))
     except Exception as e:
         raise RequirementError(
             "Could not process requirements %s. The following error occured:\n%s" %
@@ -107,7 +107,13 @@ def copy_secrets(plugin):
     if not missing_secrets:
         for secret in plugin.config.SECRETS:
             path_utils.ensure_path_exists(plugin.config.SECRETS[secret])
-            shutil.copy2(os.path.join(SECRET_DUMP, os.path.join(plugin.name, secret)), plugin.config.SECRETS[secret])
+            shutil.copy2(
+                os.path.join(
+                    SECRET_DUMP,
+                    os.path.join(plugin.name, secret)
+                ),
+                plugin.config.SECRETS[secret]
+            )
     else:
         raise MissingSecretFileError("The following secret files are missing:\n" + "\n".join(missing_secrets))
 
@@ -167,7 +173,8 @@ async def _run_external(plugin):
 
     :param AigisPlugin plugin: the plugin
     """
-    plugin._ext_proc = await asyncio.create_subprocess_exec(*plugin.config.LAUNCH, cwd=plugin.config.ENTRYPOINT)
+    plugin._ext_proc = await asyncio.create_subprocess_exec(*plugin.config.LAUNCH,
+                                                            cwd=plugin.config.ENTRYPOINT)
 
 
 def _threaded_async_process_wait(plugin, manager):

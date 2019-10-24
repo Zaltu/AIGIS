@@ -128,9 +128,7 @@ class PluginManager(list):
             raise
 
         # VERY IMPORTANT
-        plugin.type = plugin_config.PLUGIN_TYPE
-        plugin.restart = getattr(plugin_config, "RESTART", False)
-        plugin.config = plugin_config
+        _config_plugin_extra(plugin, plugin_config)
 
         plugin.log.boot("Preparing to launch...")
         self.append(self._aigisplugin_load_wrapper(plugin))
@@ -235,3 +233,18 @@ def _download(url, plugin_path):
     :param str plugin_path: path to download to
     """
     pygit2.clone_repository(url, plugin_path, checkout_branch="master")
+
+
+def _config_plugin_extra(plugin, plugin_config):
+    """
+    Perform some confiuration on the plugin and config so all entries contain some standardized information.
+    This should probably all be moved to AigisPlugin, including all the config load logic.
+
+    :param AigisPlugin plugin: plugin to configure
+    :param object plugin_config: this plugin's config
+    """
+    plugin.type = plugin_config.PLUGIN_TYPE
+    plugin.restart = getattr(plugin_config, "RESTART", False)
+    plugin.config = plugin_config
+    if not hasattr(plugin.config, "SECRETS"):
+        setattr(plugin.config, "SECRETS", {})
