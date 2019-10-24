@@ -90,7 +90,10 @@ class PluginManager(list):
         """
         LOG.shutdown("Requesting plugins clean themselves up.")
         for plugin in self:
-            plugin.cleanup()
+            try:
+                plugin.cleanup()
+            except:  #pylint: disable=bare-except
+                LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
 
     def _load_one(self, plugin_name, plugin_path, plugin_config_path, log_manager, plugin_url):
         """
