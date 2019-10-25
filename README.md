@@ -54,6 +54,18 @@ When providing a path to the local source of a plugin, AIGIS will *copy the prov
 <br>
 <br>
 
+# Requirements
+AIGIS is tested under __*Python 3.7.3*__ on __*Linux/Fedora*__ and is compatible with all Linux and MacOS systems.
+
+Compatibility with Windows technically exists __if no internal-local__ plugins are present. This is due to Windows not supporting `os.fork` which is required to spawn properly contextualized environments via subprocessing. This is unlikely to ever change unless Bill gets his shit together and makes a decent OS.
+
+AIGIS requires the following pip packages, as defined in `requirements.txt`:
+- `toml` >= 0.10.0
+- `pygit2` == 0.28.*
+
+These are the requirements for running AIGIS on it's own. Plugins may have other requirements, both executable and through pip. Check your plugin's requirements before launching AIGIS to ensure they can be met.
+
+
 # Plugin Types
 There are three different logically separate types of plugins that Aigis can run. Due to the fundamentally different nature of each of these types, they are implemented in completely different ways. While some cases may have overlap in execution, there should be no code duplication in theory. At least in a perfectly executed build of a plugin graph.
 
