@@ -10,7 +10,6 @@ import pygit2
 
 from utils import path_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
-from plugins import PluginLoader
 from diary.AigisLog import LOG
 
 class PluginManager(list):
@@ -91,7 +90,7 @@ class PluginManager(list):
 
         plugin.log.boot("Preparing to launch...")
         try:
-            PluginLoader.load(plugin, self)
+            plugin.loader.load(plugin, self)
             self.append(plugin)
         except Exception as e:
             if isinstance(e, exc_utils.PluginLoadError):

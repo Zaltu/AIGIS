@@ -3,25 +3,35 @@ Representation of a plugin with handlers used by the core to properly route traf
 """
 import os
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
+from plugins import PluginLoader
+
+_LOADER_TYPES = {
+    "core": PluginLoader.LoadCore,
+    "internal-local": PluginLoader.LoadInternalLocal,
+    "external": PluginLoader.LoadExternal,
+    "default": PluginLoader.Loader  # Planned error
+}
 
 class AigisPlugin():
     """
     A plugin that can be managed by AIGIS and it's core.
 
     :param str name: name of the plugin
+    :param LogManager log_manager: the log manager for this AIGIS instance
     :param str ptype: the plugin type
     :param bool restart: whether an auto-restart should be attempted on death
     :param object config: the plugin's config namespace
-    :param LogManager log_manager: the log manager for this AIGIS instance
+    :param PluginLoader.Loader loader: loder object appropriate for this plugin
     """
-    def __init__(self, name, log_manager, ptype=None, restart=False, config=None):
+    def __init__(self, name, log_manager, ptype=None, restart=False, config=None, loader=None):
         self.id = id(self)
         self.name = name
-        self.type = ptype
-        self.restart = restart
         self.root = os.path.join(path_utils.PLUGIN_ROOT_PATH, self.name)
         self.config_path = os.path.join(self.root, "AIGIS/AIGIS.config")
+        self.type = ptype
+        self.restart = restart
         self.config = config
+        self.loader = loader
         self.log = log_manager.hook(self)
         self.log.boot("Registered plugin...")
 
@@ -61,6 +71,7 @@ class AigisPlugin():
         self.restart = getattr(self.config, "RESTART", False)
         if not hasattr(self.config, "SECRETS"):
             setattr(self.config, "SECRETS", {})
+        self.loader = _LOADER_TYPES.get(self.type, _LOADER_TYPES.get("default"))
 
     def cleanup(self):
         """
