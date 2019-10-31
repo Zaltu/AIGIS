@@ -25,9 +25,9 @@ class AigisLogger(logging.getLoggerClass()):
         super().__init__(self)
         self.log_file = _plugin_file_name(plugin)
         self.name = plugin.name
-        _add_log_handlers(self, self.log_file)
+        fh = _add_log_handlers(self, self.log_file)
         if plugin.type == "external":
-            self.filehandler = open(self.log_file, 'a+')
+            self.filehandler = fh
 
     def tail(self):
         """

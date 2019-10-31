@@ -4,6 +4,7 @@ Container module for logging utility functions.
 import os
 import sys
 import logging
+from logging.handlers import TimedRotatingFileHandler
 
 from utils import path_utils  #pylint: disable=no-name-in-module
 
@@ -29,13 +30,17 @@ def _add_log_handlers(logger, logfile):
 
     :param logging.logger logger: the logger to configure
     :param str logfile: file to log to disk
+
+    :returns: the rotating file handler, used for subprocess logging.
+    :rtype: FileHandler
     """
     path_utils.ensure_file_exists(logfile)
     logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(logfile)
+    fh = TimedRotatingFileHandler(logfile, when="midnight", backupCount=3)
     fh.setFormatter(logging.Formatter('%(asctime)s : %(levelname)s : %(message)s'))
     logger.addHandler(fh)
     logger.addHandler(_SH)
+    return fh
 
 
 ### Define extra custom logging levels.
