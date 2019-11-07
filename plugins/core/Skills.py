@@ -27,6 +27,24 @@ class Skills():
         if hasattr(mod, "cleanup"):
             plugin.cleanup = mod.cleanup
 
+    def _AIGISforgetskill(self, mod, plugin):
+        """
+        Remove the attributes from a module that were loaded into this class.
+        Somewhat dangerous to call, obviously. Should only be called as part of reloading a core module, and
+        all that entails.
+
+        :param module mod: module who's functionality to port
+        :param AigisPlugin plugin: this AigisPlugin
+        """
+        for name in mod.SKILLS:
+            pseq = name.split(".")
+            try:
+                delattr(self, pseq[0])
+            except AttributeError:
+                plugin.log.error("Attempted to deregister %s, which cannot be found in the core.", name)
+                continue
+            plugin.log.warning("Deregistered %s...", name)
+
     def _AIGISrecurdict(self, mod, pseq, i, ns, log):
         """
         False recursivity to parse the point sequence of the submitted injection and copy the
