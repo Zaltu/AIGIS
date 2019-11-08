@@ -179,7 +179,7 @@ class LoadInternalLocal(Loader):
 
         :param AigisPlugin plugin: the plugin
         """
-        super().contextualize(plugin)
+        Loader.contextualize(plugin)
         # launch is only a path on internal plugins
         plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
 
