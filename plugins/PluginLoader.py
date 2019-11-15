@@ -204,7 +204,6 @@ class LoadCore(Loader):
             plugin
         )
         plugin.log.boot("Skills deregistered.")
-        plugin.reload = True
         manager.bury(plugin)
 
 
@@ -265,7 +264,6 @@ class LoadInternalLocal(Loader):
 
         :raises AttributeError: if the plugin has no internal process attached to it
         """
-        plugin.reload = True
         try:
             plugin._int_proc.kill()
         except AttributeError as e:
@@ -333,7 +331,6 @@ class LoadExternal(Loader):
 
         :raises AttributeError: if the plugin has no external process attached to it
         """
-        plugin.reload = True
         try:
             plugin._ext_proc.kill()
         except AttributeError as e:
