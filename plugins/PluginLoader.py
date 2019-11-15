@@ -138,6 +138,23 @@ class Loader():
         """
         raise InvalidPluginTypeError("Cannot process plugin type %s." % plugin.config.PLUGIN_TYPE)
 
+    @staticmethod
+    def reload(plugin, manager):
+        """
+        This plugin exposes an aigis.<module>.AIGISreload function in the aigis core module for each plugin.
+        This allows plugins to be reloaded (and potentially updated) without needing to have the "restart"
+        option selected. Since it's difficult/impossible to crash core plugins as well, this is done from
+        here.
+
+        :param AigisPlugin plugin: the plugin to reload
+        :param PluginManager manager: the plugin manager singleton
+
+        :raises InvalidPluginTypeError: if the plugin type specified in the plugin config is not valid
+        """
+        raise InvalidPluginTypeError(
+            "Cannot reload plugin %s. Plugin type invalid. How was it loaded to begin with?" % plugin.name
+        )
+
 
 class LoadCore(Loader):
     """
@@ -165,6 +182,29 @@ class LoadCore(Loader):
             plugin
         )
         plugin.log.boot("Skills acquired.")
+
+    @staticmethod
+    def reload(plugin, manager):
+        """
+        Fully kill the core plugin by removing all it's references in the core skills object then request
+        the manager to reload it.
+        WARNING that this won't update the available libraries in internal or external plugins unless they
+        too are reloaded, since the references are sourced on launch.
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+        """
+        import aigis as core_skills # AigisCore.skills
+        # We need to add the plugin config's entrypoint to the PYTHONPATH
+        # so imports work as expected on requirements
+        core_skills._AIGISforgetskill(
+            mod_utils.import_from_path(
+                _prep_core_injector_file(plugin)
+            ),
+            plugin
+        )
+        plugin.log.boot("Skills deregistered.")
+        manager.bury(plugin)
 
 
 class LoadInternalLocal(Loader):
@@ -214,6 +254,24 @@ class LoadInternalLocal(Loader):
         Thread(target=LoadInternalLocal._threaded_child_process_wait, args=(plugin, manager)).start()
 
     @staticmethod
+    def reload(plugin, manager):
+        """
+        Reload an internal plugin by setting it's reload flag and killing the process.
+        Realistically, this may not be safe for all plugins. Up to user to use responsibly.
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+
+        :raises AttributeError: if the plugin has no internal process attached to it
+        """
+        try:
+            plugin._int_proc.kill()
+        except AttributeError as e:
+            raise AttributeError("Missing internal process for plugin %s. A reload request was made when the"
+                                 "plugin wasn't active.") from e
+
+
+    @staticmethod
     def _wrap_child_process_launch(fpath, aigis, log):
         """
         Get a function wrapping the functionality needed to launch an internal plugin with the correct
@@ -261,6 +319,23 @@ class LoadExternal(Loader):
         ALOOP.run_until_complete(LoadExternal._run_external(plugin))
         plugin.log.boot("Running...")
         Thread(target=LoadExternal._threaded_async_process_wait, args=(plugin, manager)).start()
+
+    @staticmethod
+    def reload(plugin, manager):
+        """
+        Reload an external plugin by setting it's reload flag and killing the process.
+        Realistically, this may not be safe for all plugins. Up to user to use responsibly.
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+
+        :raises AttributeError: if the plugin has no external process attached to it
+        """
+        try:
+            plugin._ext_proc.kill()
+        except AttributeError as e:
+            raise AttributeError("Missing external process for plugin %s. A reload request was made when the"
+                                 "plugin wasn't active.") from e
 
     @staticmethod
     async def _run_external(plugin):

@@ -2,6 +2,7 @@
 Representation of a plugin with handlers used by the core to properly route traffic.
 """
 import os
+
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
 from plugins import PluginLoader
 
@@ -21,7 +22,7 @@ class AigisPlugin():
     :param str ptype: the plugin type
     :param bool restart: whether an auto-restart should be attempted on death
     :param object config: the plugin's config namespace
-    :param PluginLoader.Loader loader: loder object appropriate for this plugin
+    :param PluginLoader.Loader loader: loader class appropriate for this plugin
     """
     def __init__(self, name, log_manager, ptype=None, restart=False, config=None, loader=None):
         self.id = id(self)
@@ -30,6 +31,7 @@ class AigisPlugin():
         self.config_path = os.path.join(self.root, "AIGIS/AIGIS.config")
         self.type = ptype
         self.restart = restart
+        self.reload = False
         self.config = config
         self.loader = loader
         self.log = log_manager.hook(self)

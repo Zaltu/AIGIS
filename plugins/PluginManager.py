@@ -41,9 +41,11 @@ class PluginManager(list):
 
         :param AigisPlugin plugin: dead plugin to bury
         """
-        if plugin.restart:
+        if plugin.restart or plugin.reload:
             plugin.log.info("Attempting to restart plugin...")
             self._aigisplugin_load_wrapper(plugin)
+            if plugin.reload:
+                plugin.reload = False
             return
 
         if plugin in self:
