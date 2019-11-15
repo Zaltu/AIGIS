@@ -2,6 +2,7 @@
 Representation of a plugin with handlers used by the core to properly route traffic.
 """
 import os
+
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
 from plugins import PluginLoader
 
