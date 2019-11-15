@@ -38,6 +38,10 @@ class Aigis():
         # Expose the core skills object as importable module in order to meme the python syntax
         sys.modules["aigis"] = self.skills
 
+        # Before plugins are even loaded, expose the core skills server
+        from proxinator import _aigis
+        _aigis.CORE_SERVER.start()
+
         # Launch the plugin manager
         LOG.boot("Launching plugin manager...")
         self.plugins = PluginManager()

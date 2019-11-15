@@ -6,11 +6,9 @@ import sys
 import shutil
 import asyncio
 import subprocess
-import multiprocessing
 from threading import Thread
 from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
-from plugins.internal.WatchDog import jiiii  # 2smug
 
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
@@ -195,8 +193,6 @@ class LoadCore(Loader):
         :param PluginManager manager: the plugin manager singleton
         """
         import aigis as core_skills # AigisCore.skills
-        # We need to add the plugin config's entrypoint to the PYTHONPATH
-        # so imports work as expected on requirements
         core_skills._AIGISforgetskill(
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin)
@@ -211,6 +207,7 @@ class LoadInternalLocal(Loader):
     """
     Plugin loader for the INTERNAL-LOCAL plugin type.
     """
+    ProxyPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../proxinator/injector/aigis.py"))
     @staticmethod
     def contextualize(plugin):
         """
@@ -235,23 +232,21 @@ class LoadInternalLocal(Loader):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        import aigis as core_skills # AigisCore.skills
-        # We need to add the plugin config's entrypoint to the PYTHONPATH
-        # so imports work as expected on requirements
-        sys.path.append(plugin.config.ENTRYPOINT)
         core_file = _prep_core_injector_file(plugin)
         if core_file:
-            core_skills._AIGISlearnskill(
+            # We need to add the plugin config's entrypoint to the PYTHONPATH
+            # so imports work as expected on requirements
+            sys.path.append(plugin.config.ENTRYPOINT)
+            import aigis
+            aigis._AIGISlearnskill(
                 mod_utils.import_from_path(core_file),
                 plugin.log
             )
             plugin.log.boot("Internal plugin registered skills...")
-        plugin._int_proc = multiprocessing.Process(
-            target=LoadInternalLocal._wrap_child_process_launch,
-            args=(plugin.config.LAUNCH, core_skills, plugin.log)
-        )
-        plugin._int_proc.start()
-        Thread(target=LoadInternalLocal._threaded_child_process_wait, args=(plugin, manager)).start()
+
+        ALOOP.run_until_complete(LoadInternalLocal._run_internal(plugin))
+        plugin.log.boot("Running...")
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -270,35 +265,41 @@ class LoadInternalLocal(Loader):
             raise AttributeError("Missing internal process for plugin %s. A reload request was made when the"
                                  "plugin wasn't active.") from e
 
+    @staticmethod
+    async def _run_internal(plugin):
+        """
+        Launch an asyncio subprocess.
+
+        :param AigisPlugin plugin: the plugin
+        """
+        plugin._int_proc = await asyncio.create_subprocess_exec(
+            [
+                sys.executable,
+                LoadInternalLocal.ProxyPath,
+                "--ENTRYPOINT", plugin.config.ENTRYPOINT,
+                "--LAUNCH", plugin.config.LAUNCH
+            ],
+            stdout=plugin.log.filehandler,
+            stderr=plugin.log.filehandler
+        )
 
     @staticmethod
-    def _wrap_child_process_launch(fpath, aigis, log):
+    def _threaded_async_process_wait(plugin, manager):
         """
-        Get a function wrapping the functionality needed to launch an internal plugin with the correct
-        AIGIS runtime context. Sets the aigis instance as an importable module and calls the start
-        function with the logger.
+        Launch the Watchdog for this plugin's process.
+        Can only be called on an external plugin.
 
-        NEVER CALL THIS DIRECTLY IN THE MAIN PROCESS.
-
-        :param str fpath: path to launch file
-        :param object aigis: the aigis core module
-        :param logging.logger log: the plugin's AigisLog's logger
-
-        :raises AttributeError: amongst other things when no "launch" function can be found in the specified
-        launch file.
+        :param AigisPlugin plugin: the external plugin to wait for.
+        :param PluginManager manager: this instance's PluginManager
         """
-        # This should be run in a separate process
-        sys.modules["aigis"] = aigis
-        try:
-            launch_mod = mod_utils.import_from_path(fpath)
-            launch_mod.launch(log)
-        except AttributeError:
-            log.error("Cannot find the required function \"launch\" in the file %s", fpath)
-            raise
+        ALOOP.run_until_complete(jiii(plugin, manager))
 
-    @staticmethod
-    def _threaded_child_process_wait(plugin, manager):
-        jiiii(plugin, manager)
+
+class LoadInternalRemote(Loader):
+    """
+    Launch an internal plugin on a remote host
+    """
+    # TODO
 
 
 class LoadExternal(Loader):
@@ -318,7 +319,7 @@ class LoadExternal(Loader):
         """
         ALOOP.run_until_complete(LoadExternal._run_external(plugin))
         plugin.log.boot("Running...")
-        Thread(target=LoadExternal._threaded_async_process_wait, args=(plugin, manager)).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -347,16 +348,16 @@ class LoadExternal(Loader):
         plugin._ext_proc = await asyncio.create_subprocess_exec(*plugin.config.LAUNCH,
                                                                 cwd=plugin.config.ENTRYPOINT)
 
-    @staticmethod
-    def _threaded_async_process_wait(plugin, manager):
-        """
-        Launch the Watchdog for this plugin's process.
-        Can only be called on an external plugin.
 
-        :param AigisPlugin plugin: the external plugin to wait for.
-        :param PluginManager manager: this instance's PluginManager
-        """
-        ALOOP.run_until_complete(jiii(plugin, manager))
+def _threaded_async_process_wait(plugin, manager):
+    """
+    Launch the Watchdog for this plugin's process.
+    Can only be called on an external plugin.
+
+    :param AigisPlugin plugin: the external plugin to wait for.
+    :param PluginManager manager: this instance's PluginManager
+    """
+    ALOOP.run_until_complete(jiii(plugin, manager))
 
 
 def _prep_core_injector_file(plugin):
