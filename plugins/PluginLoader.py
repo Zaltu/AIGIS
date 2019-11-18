@@ -260,7 +260,7 @@ class LoadInternalLocal(Loader):
         :raises AttributeError: if the plugin has no internal process attached to it
         """
         try:
-            plugin._int_proc.kill()
+            plugin._ext_proc.kill()
         except AttributeError as e:
             raise AttributeError("Missing internal process for plugin %s. A reload request was made when the"
                                  "plugin wasn't active.") from e
@@ -272,8 +272,8 @@ class LoadInternalLocal(Loader):
 
         :param AigisPlugin plugin: the plugin
         """
-        plugin._int_proc = await asyncio.create_subprocess_exec(
-            [
+        plugin._ext_proc = await asyncio.create_subprocess_exec(
+            *[
                 sys.executable,
                 LoadInternalLocal.ProxyPath,
                 "--ENTRYPOINT", plugin.config.ENTRYPOINT,
