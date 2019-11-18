@@ -53,7 +53,7 @@ class AIGISpseq():
 class WrapManager(SyncManager):
     """Wrapper around the multiprocessing manager because classmethods."""
 # Register our pseq parsing wrapper class
-WrapManager.register("process", callable=AIGISpseq)
+WrapManager.register("get_aigis", callable=AIGISpseq)
 
 # The Manager object. Runs on localhost:50000
 WM = WrapManager(address=("0.0.0.0", 50000), authkey=b"aigis")

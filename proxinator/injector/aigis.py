@@ -14,12 +14,12 @@ class _WrapManager(SyncManager):
     Simple wrapper around SyncManager for cleanliness because classmethods
     """
 # Register the pseq processing function
-_WrapManager.register("process")
+_WrapManager.register("get_aigis")
 _WMGR = _WrapManager(address=("0.0.0.0", 50000), authkey=b"aigis")
 _WMGR.connect()
 
 
-def __inject(pseq, *args, **kwargs):
+def _inject(pseq, *args, **kwargs):
     """
     Underlying RPC logic powering the transfer. Connect to the RPC port and fetch the remote processor proxy,
     then pass it the pseq. It will return the result of the pseq processing.
@@ -31,8 +31,8 @@ def __inject(pseq, *args, **kwargs):
     :returns: whatever the remote processing of the pseq returns, if it is a valid type
     :rtype: object
     """
-    tclass = _WMGR.process()
-    return tclass.get_the_stuff(pseq, *args, **kwargs)
+    _proxy_aigis = _WMGR.get_aigis()
+    return _proxy_aigis.parse_pseq(pseq, *args, **kwargs)
 
 class _AIGISCopyCat():
     """
@@ -54,7 +54,7 @@ class _AIGISCopyCat():
         :returns: the return of the injected call from the server
         :rtype: object
         """
-        return __inject(self.pseq, *args, **kwargs)
+        return _inject(self.pseq, *args, **kwargs)
 
     def __getattr__(self, attr):
         """
