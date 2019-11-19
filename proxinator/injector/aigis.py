@@ -17,6 +17,7 @@ class _WrapManager(SyncManager):
 _WrapManager.register("get_aigis")
 _WMGR = _WrapManager(address=("0.0.0.0", 50000), authkey=b"aigis")
 _WMGR.connect()
+_REMOTE_AIGIS_CORE = _WMGR.get_aigis()
 
 
 def _inject(pseq, *args, **kwargs):
@@ -31,8 +32,7 @@ def _inject(pseq, *args, **kwargs):
     :returns: whatever the remote processing of the pseq returns, if it is a valid type
     :rtype: object
     """
-    _proxy_aigis = _WMGR.get_aigis()
-    return _proxy_aigis.parse_pseq(pseq, *args, **kwargs)
+    return _REMOTE_AIGIS_CORE.parse_pseq(pseq, *args, **kwargs)
 
 class _AIGISCopyCat():
     """
@@ -92,15 +92,7 @@ sys.modules["aigis"] = _AIGISProxy()
 
 ### From here on is logic related to launching the plugin from the arguments received from AIGIS.
 #pylint: disable=wrong-import-position,wrong-import-order
-import os
 from argparse import ArgumentParser
-
-# Import our mod_utils so we don't need to duplicate the logic here
-UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", "../", "utils"))
-sys.path.append(UTILS_PATH)
-import mod_utils
-# Pop from the path once imported so we don't accidentally conflict w/ something in the plugin
-sys.path.pop()
 
 PARSER = ArgumentParser()
 PARSER.add_argument("--ENTRYPOINT", dest="ENTRYPOINT")
@@ -108,9 +100,5 @@ PARSER.add_argument("--LAUNCH", dest="LAUNCH")
 ARGS = PARSER.parse_args()
 
 sys.path.append(ARGS.ENTRYPOINT)
-LCHR = mod_utils.import_from_path(ARGS.LAUNCH)
-
-# Pop mod_utils from the system modules to avoid conflicts
-sys.modules.pop("mod_utils")
-
+LCHR = __import__(ARGS.LAUNCH)
 LCHR.launch()

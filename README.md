@@ -163,7 +163,7 @@ Both internal and external plugins use a required parameter called `LAUNCH`. Whi
 |:-----------:|:--------:|:-------:|-------------|
 | HOST        | NO      | string  | Host on which to run this plugin. Can be `localhost` if desired. Defaults to `localhost`. |
 | LAUNCH (EXTERNAL)    | YES      | list[string] | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. | 
-|LAUNCH (INTERNAL)     | YES      | path         | Path to the Python file containing the plugin's launch function. This function __*MUST* have the signature__ `def launch()`. Anything sent to `stdout` or `stderr` will be automatically logged. |
+|LAUNCH (INTERNAL)     | YES      | module name         | Importable sequence to the Python file containing the plugin's launch function, relative to the ENTRYPOINT given (used to import the launch file, eg `main` -> `import main`). The function __*MUST* have the signature__ `def launch()`. Anything sent to `stdout` or `stderr` will be automatically captured and logged. |
 
 
 ## Config File Perks
@@ -215,7 +215,7 @@ SKILLS = ["coolstuff.firstcoolthing", "coolstuff.secondcoolthing"]
 ```python
 PLUGIN_TYPE = "internal"
 ENTRYPOINT = "{root}"
-LAUNCH = "{root}/main.py"
+LAUNCH = "main"
 
 SYSTEM_REQUIREMENTS = ["pip3.7", "ffmpeg"]
 
