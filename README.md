@@ -1,11 +1,11 @@
 # AIGIS
 Welcome to AIGIS  
 ```
-A - Artificial
-I - Intelligence
-G - Governing
-I - Independent
-S - Systems
+A - Aggregation of
+I - Independently
+G - Governed
+I - Information
+S - Sources
 ```
 ## Statement of Purpose and Origins
 The goal of AIGIS is to provide a centralized controlling "brain" to act as a link between multiple independently developed systems. In essence, a way of managing the runtimes of multiple programs at once, with centralized information. Based on my experiences, day to day environments tend to slowly become more and more of a spaghettied mess of interdependent relationships over time (technical debt, in a sense). By centralizing the control point of all these dependencies, it becomes much easier to manage missing and otherwise broken dependencies and maintain a clear idea of what is potentially problematic without necessarily needing to keep everything up to date.
