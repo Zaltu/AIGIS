@@ -10,7 +10,7 @@ from plugins.core.Skills import Skills
 from diary.LogManager import LogManager
 from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 
-_PLUGIN_TYPES = ["core", "internal-local", "internal-remote", "external"]
+_PLUGIN_TYPES = ["core", "internal", "external"]
 
 class Aigis():
     """

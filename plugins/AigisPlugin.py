@@ -8,7 +8,8 @@ from plugins import PluginLoader
 
 _LOADER_TYPES = {
     "core": PluginLoader.LoadCore,
-    "internal-local": PluginLoader.LoadInternalLocal,
+    "internal": PluginLoader.LoadInternalLocal,
+    "internal-remote": PluginLoader.LoadInternalLocal,
     "external": PluginLoader.LoadExternal,
     "default": PluginLoader.Loader  # Planned error
 }
@@ -73,6 +74,8 @@ class AigisPlugin():
         self.restart = getattr(self.config, "RESTART", False)
         if not hasattr(self.config, "SECRETS"):
             setattr(self.config, "SECRETS", {})
+        if self.type == "internal" and hasattr(self.config, "HOST"):
+            self.type = "internal-remote"
         self.loader = _LOADER_TYPES.get(self.type, _LOADER_TYPES.get("default"))
 
     def cleanup(self):
