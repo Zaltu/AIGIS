@@ -65,7 +65,7 @@ class _AIGISCopyCat():
         :param str attr: the attribute requested
 
         :returns: self, the current copycat object
-        :rtype: CopyCat
+        :rtype: _AIGISCopyCat
         """
         self.pseq.append(attr)
         return self
@@ -109,4 +109,8 @@ ARGS = PARSER.parse_args()
 
 sys.path.append(ARGS.ENTRYPOINT)
 LCHR = mod_utils.import_from_path(ARGS.LAUNCH)
+
+# Pop mod_utils from the system modules to avoid conflicts
+sys.modules.pop("mod_utils")
+
 LCHR.launch()

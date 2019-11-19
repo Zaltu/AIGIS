@@ -1,6 +1,6 @@
 """
-Multiprocessing context share, but with dill instead of pickle/cPickle
-_processor represents the abstract, serverside code that holds the actual code to run in practice.
+This module holds the local server responsible for handling the incoming RPC calls from internal plugins
+running in subprocesses.
 """
 from threading import Thread
 from multiprocess.managers import SyncManager
@@ -11,11 +11,11 @@ import aigis
 class AIGISpseq():
     """
     Wrapper class around the logic used to parse the pseq of the requested call.
-    A class instance is required by the multiprocessing manager library.
+    A class instance is required by the multiprocess manager library.
     """
     def parse_pseq(self, pseq, *args, **kwargs):
         """
-        Endpoint to call any value found in mainc, forwarding the parameters used.
+        Endpoint to call any value found in aigis, forwarding the parameters used.
 
         :param list[str] pseq: point sequence in mainc to follow
         :param args: args to forward
@@ -24,19 +24,19 @@ class AIGISpseq():
         :returns: result of final layer
         :rtype: object
 
-        :raises Exception: if the arguments do not match the requested function's signature.
+        :raises TypeError: if the arguments do not match the requested function's signature.
         """
         toret = self._recurpseq(pseq, 0, aigis)
         if callable(toret):
             toret = toret(*args, **kwargs)
         elif args or kwargs:
-            raise Exception("Too many arguments:\n%s\n%s" % (args, kwargs))
+            raise TypeError("Too many arguments:\n%s\n%s" % (args, kwargs))
         return toret
 
 
     def _recurpseq(self, pseq, i, mod):
         """
-        Recursively parse the mod until the end of the point sequence
+        Recursively parse the skills until the end of the point sequence
 
         :param list[str] pseq: the point sequence
         :param int i: current index
