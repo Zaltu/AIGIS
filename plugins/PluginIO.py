@@ -16,7 +16,7 @@ path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 # Get asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
 
-class Loader():
+class PluginIO():
     """
     Parent class for loading plugins, containing all the logic that is independent to the plugin type.
     """
@@ -162,7 +162,7 @@ class Loader():
         :param AigisPlugin plugin: the plugin to stop
         """
 
-class LoadCore(Loader):
+class CoreIO(PluginIO):
     """
     Plugin loader for the CORE plugin type.
     """
@@ -211,7 +211,7 @@ class LoadCore(Loader):
         manager.bury(plugin)
 
 
-class LoadInternalLocal(Loader):
+class InternalLocalIO(PluginIO):
     """
     Plugin loader for the INTERNAL-LOCAL plugin type.
     """
@@ -224,7 +224,7 @@ class LoadInternalLocal(Loader):
 
         :param AigisPlugin plugin: the plugin
         """
-        Loader.contextualize(plugin)
+        PluginIO.contextualize(plugin)
         # launch is only a path on internal plugins
         plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
 
@@ -252,7 +252,7 @@ class LoadInternalLocal(Loader):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        ALOOP.run_until_complete(LoadInternalLocal._run_internal(plugin))
+        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
@@ -283,7 +283,7 @@ class LoadInternalLocal(Loader):
         plugin._ext_proc = await asyncio.create_subprocess_exec(
             *[
                 sys.executable,
-                LoadInternalLocal.ProxyPath,
+                InternalLocalIO.ProxyPath,
                 "--ENTRYPOINT", plugin.config.ENTRYPOINT,
                 "--LAUNCH", plugin.config.LAUNCH
             ],
@@ -301,14 +301,14 @@ class LoadInternalLocal(Loader):
         await _stop(plugin)
 
 
-class LoadInternalRemote(Loader):
+class InternalRemoteIO(PluginIO):
     """
     Launch an internal plugin on a remote host
     """
     # TODO
 
 
-class LoadExternal(Loader):
+class ExternalIO(PluginIO):
     """
     Plugin loader for the EXTERNAL plugin type.
     """
@@ -323,7 +323,7 @@ class LoadExternal(Loader):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        ALOOP.run_until_complete(LoadExternal._run_external(plugin))
+        ALOOP.run_until_complete(ExternalIO._run_external(plugin))
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 

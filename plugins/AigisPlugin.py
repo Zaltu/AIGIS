@@ -4,14 +4,14 @@ Representation of a plugin with handlers used by the core to properly route traf
 import os
 
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
-from plugins import PluginLoader
+from plugins import PluginIO
 
 _LOADER_TYPES = {
-    "core": PluginLoader.LoadCore,
-    "internal": PluginLoader.LoadInternalLocal,
-    "internal-remote": PluginLoader.LoadInternalLocal,
-    "external": PluginLoader.LoadExternal,
-    "default": PluginLoader.Loader  # Planned error
+    "core": PluginIO.CoreIO,
+    "internal": PluginIO.InternalLocalIO,
+    "internal-remote": PluginIO.InternalLocalIO,
+    "external": PluginIO.ExternalIO,
+    "default": PluginIO.PluginIO  # Planned error
 }
 
 class AigisPlugin():
