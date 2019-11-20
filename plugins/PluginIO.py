@@ -154,7 +154,7 @@ class PluginIO():
         )
 
     @staticmethod
-    async def _stop(plugin):
+    async def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
         Only implemented on process-reliant plugins, since they are the ones that need stopped.
@@ -292,7 +292,7 @@ class InternalLocalIO(PluginIO):
         )
 
     @staticmethod
-    async def _stop(plugin):
+    async def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
 
@@ -355,7 +355,7 @@ class ExternalIO(PluginIO):
                                                                 cwd=plugin.config.ENTRYPOINT)
 
     @staticmethod
-    async def _stop(plugin):
+    async def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
 
