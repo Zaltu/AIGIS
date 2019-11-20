@@ -20,7 +20,7 @@ As it progressed, it became apparent that providing more in-depth API services b
 Three grand categories encompass all of the functionality AIGIS is meant to handle. The first is monitoring various completely independent processes in a centralized location, which we refer to as external plugins. The second is to provide a centralized API service where plugins can register their functionality and expose it to the whole of AIGIS, which we refer to as core plugins. The last is to provide runtime environments that include this API service to processes running both locally and remotely, which we refer to as internal plugins. A more in-depth breakdown of each plugin type is offered below, as well as how to set them up and used them to their fullest extent.
 
 ## In Short
-AIGIS stands as a system to dynamically manage the runtime environments of multiple programs. This includes setting runtime environments, reloading, adding and removing functionality to a core system without the need to halt dependent processes.
+AIGIS stands as a system to manage the runtime environments of multiple programs. This includes dynamically setting runtime environments, reloading, adding and removing functionality to a core system without the need to halt dependent processes.
 
 
 # The AIGIS Config File
@@ -84,12 +84,12 @@ Two files are necessary in order to define a core plugin: the plugin config file
 
 ### Aigis Core Injector File
 Since this functionality is injected directly into the central AIGIS module directly on runtime, there are a few important notes to make concerning their configuration.
-1. The File:
-The only restriction in the `AIGIS.core` file explicitely is that there exist a `SKILLS` __list type constant__. This constant functions very similarly to the `__all__` standard python constant and has essentially the same syntax: a list of strings denoting the names of the values that you want exposed from your module in the AIGIS core. ONLY the values in `SKILLS` will be exposed in the core.
-2. Logging:
+1. The File  
+The only restriction in the `AIGIS.core` file explicitely is that there exist a `SKILLS` __list type constant__. This constant functions very similarly to the `__all__` standard python constant and has essentially the same syntax: a list of strings denoting the names of the values that you want exposed from your module in the AIGIS core. ONLY the values in `SKILLS` will be exposed in the core. An example of a valid core injection file can be found at then end of this README.
+2. Logging  
 Since AIGIS uses a central logging system, it is expected that core plugins be compatible with it. When injecting the contents of the AIGIS.core file, AIGIS decorates every *callable* to pass an extra argument parameter, that being a configured and slightly edited version of a python logger. To properly track output in the centralized AIGIS system, it is expected that core plugins use this logger and not any of their own.
-3. Inter-core compatibility
-It is a reasonable expectation to be able to call other core modules from a specific plugin. In fact, not being able to do so would in many ways render the entire environment significantly less useful. While there is no way for a plugin itself to ensure that another exists, the whole of the core functionality injected from all plugins is stored within a designated namespace, that is to say `aigis`. So long as you are functioning within the main process (which should generally be the case, since no daemon-like attributes are allowed in core plugins), you can access the namespace in python simply by doing a simple `import aigis`. You will then be able to call any defined skills from loaded modules from that namespace (eg `aigis.backloggery.getFortuneCookie()`). Please be mindful of plugin load order when doing this however, as *namespace entries are not reserved before injection*. While it is not pythonic, it is suggested that imports on the AIGIS core be done at a class or function level, rather than at module level, if you are worried about load order.
+3. Inter-core compatibility  
+It is a reasonable expectation to be able to call other core modules from a specific plugin. In fact, not being able to do so would in many ways render the entire environment significantly less useful. While there is no way for a plugin itself to ensure that another exists, the whole of the core functionality injected from all plugins is stored within a designated namespace, that is to say `aigis`. So long as you are functioning within the main process (which should generally be the case, since no daemon-like attributes are allowed in core plugins), you can access the namespace in python by doing a simple `import aigis`. You will then be able to call any defined skills from loaded modules from that namespace (eg `aigis.backloggery.getFortuneCookie()`). Please be mindful of plugin load order when doing this however, as *namespace entries are not reserved before injection*. While it is not pythonic, it is suggested that imports on the AIGIS core be done at a class or function level, rather than at module level, if you are worried about load order and plan on importing only specific names.
 
 
 # Internal Type
@@ -114,17 +114,91 @@ Access to AIGIS in internal plugins is represented as a module, and is called vi
 
 #### The Downside
 There are a few important conditions to take into account when calling the core from internal plugins, namely
-1. You can only import the top-level module.
+1. *You can only import the top-level module*  
 So you can do `import aigis`, but not `from aigis import amodule` or `import aigis.amodule`. This is because the `aigis` module itself is the AigisProxy which itself does not contain any of the real core's modules itself. Making references in code to `aigis.amodule` outside of the import will only send the request to the true core to evaluate that statement per say.
-2. Everything must be called.
-Including constants. The correct way to retrieve the constant integer `MAX_NAME_LENGTH` from the registered module `my_database` is by doing
+2. *Everything must be called, including constants*  
+The correct way to retrieve the constant integer `MAX_NAME_LENGTH` from the registered module `my_database` is by doing
 ```python
 import aigis
 
 MAX_NAME_LENGTH = aigis.my_database.MAX_NAME_LENGTH()
 ```
-3. Limited return types
+3. *Limited return types*  
 If the core function you are calling returns an object that cannot be serialized, an error will be raised. Thanks to the amazing work done by the `dill` and `multiprocess` packages, almost all Python objects, including classes, functions, lambdas and more are all serializable. According to the `dill` documentation, the only types not supported for serialization are [frame, generator and traceback](https://github.com/uqfoundation/dill).
+
+### **Important Notes Concerning Internal-Core Plugin Interaction**
+Since it's not necessarily obvious, this section simply servers to shed some light on what can and can't be done when sharing data and functionality accross plugins.
+
+There are two parts to take into account. First of all what functionality can be *exposed*? The simple answer is everything. Any possible functionality, including code related to frames, generators and tracebacks mentioned above, can be called accross process. AIGIS does some magic behind the scenes to make sure that any call made from another process ends up being evaluated *in the core process*. Since core plugins are loaded directly into the core process, this means they are run in a very standard manner, having access to the full scope of their runtimes.
+
+The keyword there is scope, which carries over to part two. What can be *returned/shared* accross processes? Dill of course explicitely states that frames, generators and tracebacks cannot be serialized (due to relience on the GIL, which I personally know very little about), so those types are, of course, impossible to share. This also means any object or namespace containing these kinds of objects cannot be shared, since they can also not be serialized.  
+(As a side note, custom exception types and Exception class objects are still properly raised accross processes. It is only the traceback that cannot be shared, making proper error logging important.)  
+Where the scope comes into play is that it is very important to remember that only the *local scope of the returned object* gets serialized. If, for example, a function or class refers at some point to a value that is defined outside of itself, attempting to use that in the subprocess will result in an **`NameError`** if that name is not also defined in the scope of the caller. Some examples:
+```python
+OUT_OF_SCOPE = ""
+
+<SCOPE> 
+        --> def afunction():
+        -->     in_scope = 3
+        -->     print(in_scope)
+        -->     print(OUT_OF_SCOPE)
+</SCOPE>
+
+def get_afunction():  # Expose to AIGIS core
+    return afunction
+
+# In the subprocess
+>>> import aigis
+>>> local_afunction = aigis.get_afunction()
+>>> local_afunction()
+3
+Traceback (most recent call last):
+  [...]
+  File "<stdin>", line 4, in afunction
+NameError: name 'OUT_OF_SCOPE' is not defined
+>>>
+```
+If these names are assigned values in the subprocess though, it will work without issue. This should generally be avoided however.
+```python
+REPLACE_ME = "Don't use this value!"
+
+<SCOPE> 
+        --> def afunction():
+        -->     inscope = 3
+        -->     print(inscope)
+        -->     print(REPLACE_ME)
+</SCOPE>
+
+def get_afunction():  # Expose to AIGIS core
+    return afunction
+
+# In the subprocess
+>>> import aigis
+>>> local_afunction = aigis.get_afunction()
+>>> REPLACE_ME = "Use this one!"
+>>> local_afunction()
+3
+Use this one!
+>>> 
+```
+Again, this is only applicable when `afunction` is *returned by the core and called in the remote process*. If it is called in the core directly, there is no problem.
+```python
+OUT_OF_SCOPE = "Totally fine"
+
+<SCOPE> 
+        --> def afunction():  # Expose to AIGIS core
+        -->     inscope = 3
+        -->     print(inscope)
+        -->     print(OUT_OF_SCOPE)
+</SCOPE>
+
+# In the subprocess
+# Since it is called in the core process, messages are printed to the core process stdout
+>>> import aigis
+>>> aigis.afunction()
+>>> 
+```
+
 
 ## Why Do It This Way?
 Generally speaking, and as silly as it sounds, this method was chosen so that the syntaxical manner in which the core is accessed remains the same across all plugin types (the `import aigis` syntax). The alternative would be in the vein of automatically spinning up a REST API service based on registered core plugins, but this would require much greater core plugin configuration and offer less freedom, along with ultimately still creating a number of downsides, namely requiring an HTTP module like `requests` in each internal plugin and having to standardize return types specifically to JSON or another predetermined format.
@@ -174,7 +248,7 @@ Secrets are an important part of securing any application. To avoid having to co
 
 Secrets should be placed *on local disk* in the directory `secrets/<plugin_name>` at the *top level* of the AIGIS code, where `<plugin_name>` is the name set in the AIGIS configuration file (found in `config/config.aigis`). These secrets can be copied on runtime to a location within the plugin's source code using the SECRETS config option detailed above.
 
-### {root}
+### `{root}`
 Plugins are all loaded into a certain place on runtime that isn't necessarily apparent to the config file author. Since many parameters expect path-like entries, the keyword `{root}` is formatted with the local path on disk leading to the plugin. So for example to get to the `src` file of a plugin with an internal structure of `python/AIGIS/src.py`, you can specify `{root}/python/AIGIS/src.py`. This is only done on certain specific configuration options, since many do/should not require it. The supported options for `{root}` are:
 - ENTRYPOINT
 - REQUIREMENTS_FILE
