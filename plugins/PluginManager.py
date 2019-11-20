@@ -103,7 +103,7 @@ class PluginManager(list):
 
         :param AigisPlugin plugin: the plugin to load
 
-        :raises Exception: numerous exception types can be bubbled up from the various loading mechanisms 
+        :raises Exception: numerous exception types can be bubbled up from the various loading mechanisms
         """
         try:
             plugin.loader.load(plugin, self)
