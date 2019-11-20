@@ -203,4 +203,4 @@ def safe_cleanup(plugin):
     except:  #pylint: disable=bare-except
         LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
 
-    asyncio.get_event_loop().run_until_complete(plugin.loader._stop())
+    asyncio.get_event_loop().run_until_complete(plugin.loader._stop(plugin))
