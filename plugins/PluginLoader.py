@@ -153,6 +153,14 @@ class Loader():
             "Cannot reload plugin %s. Plugin type invalid. How was it loaded to begin with?" % plugin.name
         )
 
+    @staticmethod
+    async def _stop(plugin):
+        """
+        Stop the plugin in as non-violent a way as possible.
+        Only implemented on process-reliant plugins, since they are the ones that need stopped.
+
+        :param AigisPlugin plugin: the plugin to stop
+        """
 
 class LoadCore(Loader):
     """
@@ -283,6 +291,15 @@ class LoadInternalLocal(Loader):
             stderr=plugin.log.filehandler
         )
 
+    @staticmethod
+    async def _stop(plugin):
+        """
+        Stop the plugin in as non-violent a way as possible.
+
+        :param AigisPlugin plugin: the plugin to stop
+        """
+        await _stop(plugin)
+
 
 class LoadInternalRemote(Loader):
     """
@@ -336,6 +353,30 @@ class LoadExternal(Loader):
         """
         plugin._ext_proc = await asyncio.create_subprocess_exec(*plugin.config.LAUNCH,
                                                                 cwd=plugin.config.ENTRYPOINT)
+
+    @staticmethod
+    async def _stop(plugin):
+        """
+        Stop the plugin in as non-violent a way as possible.
+
+        :param AigisPlugin plugin: the plugin to stop
+        """
+        await _stop(plugin)
+
+
+async def _stop(plugin):
+    """
+    Stop the plugin in as non-violent a way as possible.
+    Send a SIGTERM and wait for 5 seconds. If process is still running, send SIGKILL.
+
+    :param AigisPlugin plugin: the plugin to stop
+    """
+    plugin._ext_proc.terminate()
+    try:
+        await asyncio.wait_for(plugin._ext_proc.communicate(), timeout=5)
+    except asyncio.TimeoutError:
+        plugin.log.warning("Plugin taking too long to terminate, killing it.")
+        plugin._ext_proc.kill()
 
 
 def _threaded_async_process_wait(plugin, manager):

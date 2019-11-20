@@ -25,7 +25,7 @@ class AigisPlugin():
     :param object config: the plugin's config namespace
     :param PluginLoader.Loader loader: loader class appropriate for this plugin
     """
-    def __init__(self, name, log_manager, ptype=None, restart=False, config=None, loader=None):
+    def __init__(self, name, log_manager, ptype=None, restart=0, config=None, loader=None):
         self.id = id(self)
         self.name = name
         self.root = os.path.join(path_utils.PLUGIN_ROOT_PATH, self.name)
@@ -71,7 +71,7 @@ class AigisPlugin():
 
         # VERY IMPORTANT
         self.type = self.config.PLUGIN_TYPE
-        self.restart = getattr(self.config, "RESTART", False)
+        self.restart = getattr(self.config, "RESTART", 0)
         if not hasattr(self.config, "SECRETS"):
             setattr(self.config, "SECRETS", {})
         if self.type == "internal" and hasattr(self.config, "HOST"):

@@ -43,10 +43,14 @@ class PluginManager(list):
         :param AigisPlugin plugin: dead plugin to bury
         """
         if plugin.restart or plugin.reload:
-            plugin.log.info("Attempting to restart plugin...")
-            self._aigisplugin_load_wrapper(plugin)
             if plugin.reload:
+                plugin.log.info("Attempting to reload plugin...")
                 plugin.reload = False
+            elif plugin.restart:
+                plugin.log.info("Attempting to restart plugin...")
+                plugin.restart -= 1
+
+            self._aigisplugin_load_wrapper(plugin)
             return
 
         if plugin in self:
@@ -189,17 +193,14 @@ def safe_cleanup(plugin):
 
     :param AigisPlugin plugin: plugin to clean up
     """
+    # Make sure the plugin doesn't accitendally try and restart
+    plugin.restart = 0
+    plugin.reload = False
+
+    # Try and run the plugin's cleanup function. Skipped if error.
     try:
         plugin.cleanup()
     except:  #pylint: disable=bare-except
         LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
 
-    if plugin.type != "core":
-        plugin._ext_proc.terminate()
-        try:
-            asyncio.get_event_loop().run_until_complete(
-                asyncio.wait_for(plugin._ext_proc.communicate(), timeout=5)
-            )
-        except asyncio.TimeoutError:
-            LOG.warning("Plugin %s taking too long to terminate, killing it.", plugin.name)
-            plugin._ext_proc.kill()
+    asyncio.get_event_loop().run_until_complete(plugin.loader._stop())
