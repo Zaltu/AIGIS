@@ -58,4 +58,4 @@ WrapManager.register("get_aigis", callable=AIGISpseq)
 # The Manager object. Runs on localhost:50000
 WM = WrapManager(address=("0.0.0.0", 50000), authkey=b"aigis")
 # Create a thread for serving the server, since it's blocking.
-CORE_SERVER = Thread(target=WM.get_server().serve_forever)
+CORE_SERVER = Thread(target=WM.get_server().serve_forever, daemon=True)

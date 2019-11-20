@@ -2,9 +2,10 @@
 Helper module to hold and organize loaded plugins.
 """
 import os
-import subprocess
 import shutil
+import asyncio
 import traceback
+import subprocess
 
 import pygit2
 
@@ -192,3 +193,13 @@ def safe_cleanup(plugin):
         plugin.cleanup()
     except:  #pylint: disable=bare-except
         LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
+
+    if plugin.type != "core":
+        plugin._ext_proc.terminate()
+        try:
+            asyncio.get_event_loop().run_until_complete(
+                asyncio.wait_for(plugin._ext_proc.communicate(), timeout=5)
+            )
+        except asyncio.TimeoutError:
+            LOG.warning("Plugin %s taking too long to terminate, killing it.", plugin.name)
+            plugin._ext_proc.kill()

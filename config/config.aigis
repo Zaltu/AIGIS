@@ -7,6 +7,6 @@ dnd = "https://github.com/zaltu/dnd-utils.git"
 translate = "https://github.com/zaltu/translation-utils.git"
 
 [internal]
-madbot = "https://github.com/zaltu/mad-bot.git"
+#madbot = "https://github.com/zaltu/mad-bot.git"
 
 [external]

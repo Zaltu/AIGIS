@@ -246,7 +246,7 @@ class LoadInternalLocal(Loader):
 
         ALOOP.run_until_complete(LoadInternalLocal._run_internal(plugin))
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -283,17 +283,6 @@ class LoadInternalLocal(Loader):
             stderr=plugin.log.filehandler
         )
 
-    @staticmethod
-    def _threaded_async_process_wait(plugin, manager):
-        """
-        Launch the Watchdog for this plugin's process.
-        Can only be called on an external plugin.
-
-        :param AigisPlugin plugin: the external plugin to wait for.
-        :param PluginManager manager: this instance's PluginManager
-        """
-        ALOOP.run_until_complete(jiii(plugin, manager))
-
 
 class LoadInternalRemote(Loader):
     """
@@ -319,7 +308,7 @@ class LoadExternal(Loader):
         """
         ALOOP.run_until_complete(LoadExternal._run_external(plugin))
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager)).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
