@@ -3,6 +3,7 @@ Process AIGIS plugin.
 """
 import os
 import sys
+import time
 import shutil
 import asyncio
 import subprocess
@@ -154,7 +155,7 @@ class PluginIO():
         )
 
     @staticmethod
-    async def stop(plugin):
+    def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
         Only implemented on process-reliant plugins, since they are the ones that need stopped.
@@ -252,7 +253,7 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))
+        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))  # TODO this is completely busted
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
@@ -292,13 +293,13 @@ class InternalLocalIO(PluginIO):
         )
 
     @staticmethod
-    async def stop(plugin):
+    def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
 
         :param AigisPlugin plugin: the plugin to stop
         """
-        await _stop(plugin)
+        _stop(plugin)
 
 
 class InternalRemoteIO(PluginIO):
@@ -355,26 +356,36 @@ class ExternalIO(PluginIO):
                                                                 cwd=plugin.config.ENTRYPOINT)
 
     @staticmethod
-    async def stop(plugin):
+    def stop(plugin):
         """
         Stop the plugin in as non-violent a way as possible.
 
         :param AigisPlugin plugin: the plugin to stop
         """
-        await _stop(plugin)
+        _stop(plugin)
 
 
-async def _stop(plugin):
+def _stop(plugin):
     """
     Stop the plugin in as non-violent a way as possible.
     Send a SIGTERM and wait for 5 seconds. If process is still running, send SIGKILL.
 
     :param AigisPlugin plugin: the plugin to stop
     """
-    plugin._ext_proc.terminate()
     try:
-        await asyncio.wait_for(plugin._ext_proc.communicate(), timeout=5)
-    except asyncio.TimeoutError:
+        asyncio.ensure_future(plugin._ext_proc.terminate())
+    except ProcessLookupError:
+        # Process already dead. Probably exited earlier.
+        return
+
+    # This chunk is necessary because Python async FUCKING SUCKS
+    # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
+    # and then the task may not finish.
+    start = time.time()
+    while plugin._ext_proc.returncode == None and time.time()-start > 5:
+        time.sleep(0.01)
+
+    if plugin._ext_proc == None:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
 
