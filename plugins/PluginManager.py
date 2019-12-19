@@ -2,9 +2,10 @@
 Helper module to hold and organize loaded plugins.
 """
 import os
-import subprocess
 import shutil
+import asyncio
 import traceback
+import subprocess
 
 import pygit2
 
@@ -42,18 +43,23 @@ class PluginManager(list):
         :param AigisPlugin plugin: dead plugin to bury
         """
         if plugin.restart or plugin.reload:
-            plugin.log.info("Attempting to restart plugin...")
-            self._aigisplugin_load_wrapper(plugin)
             if plugin.reload:
+                plugin.log.info("Attempting to reload plugin...")
                 plugin.reload = False
+            elif plugin.restart:
+                plugin.log.info("Attempting to restart plugin...")
+                plugin.restart -= 1
+
+            self._try_load(plugin)
             return
 
         if plugin in self:
-            self.dead.append(self.pop(self.index(plugin)))
             safe_cleanup(plugin)
-
-        plugin.log.shutdown("Plugin shut down.")
-        LOG.warning("%s has terminated.", plugin.name)
+            self.dead.append(self.pop(self.index(plugin)))
+            plugin.log.shutdown("Plugin shut down.")
+            LOG.warning("%s has terminated.", plugin.name)
+        else:
+            LOG.warning("Plugin %s in an unexpected state, but not blocking.", plugin.name)
 
     def cleanup(self):
         """
@@ -77,10 +83,6 @@ class PluginManager(list):
         :param str plugin_name: name of plugin to load
         :param LogManager log_manager: the AIGIS LogManager singleton for this execution
         :param str plugin_url: web URL from which to download the plugin
-
-        :raises FileNotFoundError: explicitely if the config file cannot be found locally once the plugin
-        has been downloaded
-        :raises Exception: numerous exception types can be bubbled up from the various loading mechanisms
         """
         plugin = AigisPlugin(plugin_name, log_manager)
 
@@ -91,6 +93,18 @@ class PluginManager(list):
         plugin.configure()
 
         plugin.log.boot("Preparing to launch...")
+        self._try_load(plugin)
+
+    def _try_load(self, plugin):
+        """
+        Attempt to safely launch a single given plugin using it's launcher. Catch errors and respond
+        appropriately. This is a private function to PluginManager since it bypasses the `bury` function and
+        ends the plugin's cycle immediately if unsucessful.
+
+        :param AigisPlugin plugin: the plugin to load
+
+        :raises Exception: numerous exception types can be bubbled up from the various loading mechanisms
+        """
         try:
             plugin.loader.load(plugin, self)
             self.append(plugin)
@@ -99,6 +113,7 @@ class PluginManager(list):
                 plugin.log.shutdown("Could not load plugin, shutting down...")
             else:
                 plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", traceback.format_exc())
+            self.pop(self.index(plugin))
             self.dead.append(plugin)
             safe_cleanup(plugin)
             raise
@@ -188,7 +203,14 @@ def safe_cleanup(plugin):
 
     :param AigisPlugin plugin: plugin to clean up
     """
+    # Make sure the plugin doesn't accitendally try and restart
+    plugin.restart = 0
+    plugin.reload = False
+
+    # Try and run the plugin's cleanup function. Skipped if error.
     try:
         plugin.cleanup()
     except:  #pylint: disable=bare-except
         LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
+
+    plugin.loader.stop(plugin)

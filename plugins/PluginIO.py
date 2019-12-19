@@ -3,14 +3,13 @@ Process AIGIS plugin.
 """
 import os
 import sys
+import time
 import shutil
 import asyncio
 import subprocess
-import multiprocessing
 from threading import Thread
 from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
-from plugins.internal.WatchDog import jiiii  # 2smug
 
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
@@ -18,7 +17,7 @@ path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 # Get asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
 
-class Loader():
+class PluginIO():
     """
     Parent class for loading plugins, containing all the logic that is independent to the plugin type.
     """
@@ -155,8 +154,16 @@ class Loader():
             "Cannot reload plugin %s. Plugin type invalid. How was it loaded to begin with?" % plugin.name
         )
 
+    @staticmethod
+    def stop(plugin):
+        """
+        Stop the plugin in as non-violent a way as possible.
+        Only implemented on process-reliant plugins, since they are the ones that need stopped.
 
-class LoadCore(Loader):
+        :param AigisPlugin plugin: the plugin to stop
+        """
+
+class CoreIO(PluginIO):
     """
     Plugin loader for the CORE plugin type.
     """
@@ -195,8 +202,6 @@ class LoadCore(Loader):
         :param PluginManager manager: the plugin manager singleton
         """
         import aigis as core_skills # AigisCore.skills
-        # We need to add the plugin config's entrypoint to the PYTHONPATH
-        # so imports work as expected on requirements
         core_skills._AIGISforgetskill(
             mod_utils.import_from_path(
                 _prep_core_injector_file(plugin)
@@ -207,10 +212,11 @@ class LoadCore(Loader):
         manager.bury(plugin)
 
 
-class LoadInternalLocal(Loader):
+class InternalLocalIO(PluginIO):
     """
     Plugin loader for the INTERNAL-LOCAL plugin type.
     """
+    ProxyPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../proxinator/injector/aigis.py"))
     @staticmethod
     def contextualize(plugin):
         """
@@ -219,7 +225,7 @@ class LoadInternalLocal(Loader):
 
         :param AigisPlugin plugin: the plugin
         """
-        Loader.contextualize(plugin)
+        PluginIO.contextualize(plugin)
         # launch is only a path on internal plugins
         plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin.root)
 
@@ -235,23 +241,21 @@ class LoadInternalLocal(Loader):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        import aigis as core_skills # AigisCore.skills
-        # We need to add the plugin config's entrypoint to the PYTHONPATH
-        # so imports work as expected on requirements
-        sys.path.append(plugin.config.ENTRYPOINT)
         core_file = _prep_core_injector_file(plugin)
         if core_file:
-            core_skills._AIGISlearnskill(
+            # We need to add the plugin config's entrypoint to the PYTHONPATH
+            # so imports work as expected on requirements
+            sys.path.append(plugin.config.ENTRYPOINT)
+            import aigis
+            aigis._AIGISlearnskill(
                 mod_utils.import_from_path(core_file),
                 plugin.log
             )
             plugin.log.boot("Internal plugin registered skills...")
-        plugin._int_proc = multiprocessing.Process(
-            target=LoadInternalLocal._wrap_child_process_launch,
-            args=(plugin.config.LAUNCH, core_skills, plugin.log)
-        )
-        plugin._int_proc.start()
-        Thread(target=LoadInternalLocal._threaded_child_process_wait, args=(plugin, manager)).start()
+
+        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))  # TODO this is completely busted
+        plugin.log.boot("Running...")
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -265,43 +269,47 @@ class LoadInternalLocal(Loader):
         :raises AttributeError: if the plugin has no internal process attached to it
         """
         try:
-            plugin._int_proc.kill()
+            plugin._ext_proc.kill()
         except AttributeError as e:
             raise AttributeError("Missing internal process for plugin %s. A reload request was made when the"
                                  "plugin wasn't active.") from e
 
+    @staticmethod
+    async def _run_internal(plugin):
+        """
+        Launch an asyncio subprocess.
+
+        :param AigisPlugin plugin: the plugin
+        """
+        plugin._ext_proc = await asyncio.create_subprocess_exec(
+            *[
+                sys.executable,
+                InternalLocalIO.ProxyPath,
+                "--ENTRYPOINT", plugin.config.ENTRYPOINT,
+                "--LAUNCH", plugin.config.LAUNCH
+            ],
+            stdout=plugin.log.filehandler,
+            stderr=plugin.log.filehandler
+        )
 
     @staticmethod
-    def _wrap_child_process_launch(fpath, aigis, log):
+    def stop(plugin):
         """
-        Get a function wrapping the functionality needed to launch an internal plugin with the correct
-        AIGIS runtime context. Sets the aigis instance as an importable module and calls the start
-        function with the logger.
+        Stop the plugin in as non-violent a way as possible.
 
-        NEVER CALL THIS DIRECTLY IN THE MAIN PROCESS.
-
-        :param str fpath: path to launch file
-        :param object aigis: the aigis core module
-        :param logging.logger log: the plugin's AigisLog's logger
-
-        :raises AttributeError: amongst other things when no "launch" function can be found in the specified
-        launch file.
+        :param AigisPlugin plugin: the plugin to stop
         """
-        # This should be run in a separate process
-        sys.modules["aigis"] = aigis
-        try:
-            launch_mod = mod_utils.import_from_path(fpath)
-            launch_mod.launch(log)
-        except AttributeError:
-            log.error("Cannot find the required function \"launch\" in the file %s", fpath)
-            raise
-
-    @staticmethod
-    def _threaded_child_process_wait(plugin, manager):
-        jiiii(plugin, manager)
+        _stop(plugin)
 
 
-class LoadExternal(Loader):
+class InternalRemoteIO(PluginIO):
+    """
+    Launch an internal plugin on a remote host
+    """
+    # TODO
+
+
+class ExternalIO(PluginIO):
     """
     Plugin loader for the EXTERNAL plugin type.
     """
@@ -316,9 +324,9 @@ class LoadExternal(Loader):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        ALOOP.run_until_complete(LoadExternal._run_external(plugin))
+        ALOOP.run_until_complete(ExternalIO._run_external(plugin))
         plugin.log.boot("Running...")
-        Thread(target=LoadExternal._threaded_async_process_wait, args=(plugin, manager)).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -348,15 +356,49 @@ class LoadExternal(Loader):
                                                                 cwd=plugin.config.ENTRYPOINT)
 
     @staticmethod
-    def _threaded_async_process_wait(plugin, manager):
+    def stop(plugin):
         """
-        Launch the Watchdog for this plugin's process.
-        Can only be called on an external plugin.
+        Stop the plugin in as non-violent a way as possible.
 
-        :param AigisPlugin plugin: the external plugin to wait for.
-        :param PluginManager manager: this instance's PluginManager
+        :param AigisPlugin plugin: the plugin to stop
         """
-        ALOOP.run_until_complete(jiii(plugin, manager))
+        _stop(plugin)
+
+
+def _stop(plugin):
+    """
+    Stop the plugin in as non-violent a way as possible.
+    Send a SIGTERM and wait for 5 seconds. If process is still running, send SIGKILL.
+
+    :param AigisPlugin plugin: the plugin to stop
+    """
+    try:
+        asyncio.ensure_future(plugin._ext_proc.terminate())
+    except ProcessLookupError:
+        # Process already dead. Probably exited earlier.
+        return
+
+    # This chunk is necessary because Python async FUCKING SUCKS
+    # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
+    # and then the task may not finish.
+    start = time.time()
+    while plugin._ext_proc.returncode == None and time.time()-start > 5:
+        time.sleep(0.01)
+
+    if plugin._ext_proc == None:
+        plugin.log.warning("Plugin taking too long to terminate, killing it.")
+        plugin._ext_proc.kill()
+
+
+def _threaded_async_process_wait(plugin, manager):
+    """
+    Launch the Watchdog for this plugin's process.
+    Can only be called on an external plugin.
+
+    :param AigisPlugin plugin: the external plugin to wait for.
+    :param PluginManager manager: this instance's PluginManager
+    """
+    ALOOP.run_until_complete(jiii(plugin, manager))
 
 
 def _prep_core_injector_file(plugin):

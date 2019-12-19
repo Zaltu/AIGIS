@@ -4,13 +4,14 @@ Representation of a plugin with handlers used by the core to properly route traf
 import os
 
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
-from plugins import PluginLoader
+from plugins import PluginIO
 
 _LOADER_TYPES = {
-    "core": PluginLoader.LoadCore,
-    "internal-local": PluginLoader.LoadInternalLocal,
-    "external": PluginLoader.LoadExternal,
-    "default": PluginLoader.Loader  # Planned error
+    "core": PluginIO.CoreIO,
+    "internal": PluginIO.InternalLocalIO,
+    "internal-remote": PluginIO.InternalLocalIO,
+    "external": PluginIO.ExternalIO,
+    "default": PluginIO.PluginIO  # Planned error
 }
 
 class AigisPlugin():
@@ -24,7 +25,7 @@ class AigisPlugin():
     :param object config: the plugin's config namespace
     :param PluginLoader.Loader loader: loader class appropriate for this plugin
     """
-    def __init__(self, name, log_manager, ptype=None, restart=False, config=None, loader=None):
+    def __init__(self, name, log_manager, ptype=None, restart=0, config=None, loader=None):
         self.id = id(self)
         self.name = name
         self.root = os.path.join(path_utils.PLUGIN_ROOT_PATH, self.name)
@@ -70,9 +71,11 @@ class AigisPlugin():
 
         # VERY IMPORTANT
         self.type = self.config.PLUGIN_TYPE
-        self.restart = getattr(self.config, "RESTART", False)
+        self.restart = getattr(self.config, "RESTART", 0)
         if not hasattr(self.config, "SECRETS"):
             setattr(self.config, "SECRETS", {})
+        if self.type == "internal" and hasattr(self.config, "HOST"):
+            self.type = "internal-remote"
         self.loader = _LOADER_TYPES.get(self.type, _LOADER_TYPES.get("default"))
 
     def cleanup(self):

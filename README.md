@@ -1,11 +1,11 @@
 # AIGIS
 Welcome to AIGIS  
 ```
-A - Artificial
-I - Intelligence
-G - Governing
-I - Independent
-S - Systems
+A - Aggregation of
+I - Independently
+G - Governed
+I - Information
+S - Sources
 ```
 ## Statement of Purpose and Origins
 The goal of AIGIS is to provide a centralized controlling "brain" to act as a link between multiple independently developed systems. In essence, a way of managing the runtimes of multiple programs at once, with centralized information. Based on my experiences, day to day environments tend to slowly become more and more of a spaghettied mess of interdependent relationships over time (technical debt, in a sense). By centralizing the control point of all these dependencies, it becomes much easier to manage missing and otherwise broken dependencies and maintain a clear idea of what is potentially problematic without necessarily needing to keep everything up to date.
@@ -16,11 +16,11 @@ AIGIS originated as a means to centralize the monitoring of multiple separately 
 
 As it progressed, it became apparent that providing more in-depth API services between programs would be hugely beneficial in simplifying the configuration and setup of larger environments. Being able to provide a standard, centralized way of accessing other program's code turned AIGIS into an API service on top of a monitoring one. It's at this point that the concept of "plugins" was formed. Plugins may or may not have dependencies on other plugins, but no matter what requirements it has it does not need to know if or how the dependency is loaded. In fact, the dependency could be a completely differently implemented version of what it expects, but so long as AIGIS can serve the request the plugin won't know.
 
-## Assumption Programming
-AIGIS as a system is partially based on a particular programming style that is centered around assumptions. Mainly, an AIGIS plugin assumes that it can receive and interact with data coming from AIGIS's API services, and assumes the environment is set up correctly for it to receive the correct response. AIGIS assumes that plugins are properly configured and will not cause lag or other undesirable results, and that all dependencies are properly set up by the system administrator. Because of this, any singular plugin can be completely broken without necessarily affecting the rest, unless there's a direct dependency via the AIGIS API service, in which case the result will depend on just how broken the dependency turns out to be.
-
 ## Uses
 Three grand categories encompass all of the functionality AIGIS is meant to handle. The first is monitoring various completely independent processes in a centralized location, which we refer to as external plugins. The second is to provide a centralized API service where plugins can register their functionality and expose it to the whole of AIGIS, which we refer to as core plugins. The last is to provide runtime environments that include this API service to processes running both locally and remotely, which we refer to as internal plugins. A more in-depth breakdown of each plugin type is offered below, as well as how to set them up and used them to their fullest extent.
+
+## In Short
+AIGIS stands as a system to manage the runtime environments of multiple programs. This includes dynamically setting runtime environments, reloading, adding and removing functionality to a core system without the need to halt dependent processes.
 
 
 # The AIGIS Config File
@@ -28,8 +28,7 @@ The AIGIS config file is the place to set which plugins should be run by AIGIS w
 
 The config file is in TOML format, and separated into three parts: core, internal and external. These correspond to the three different types of plugins available to AIGIS (see section below on Plugin Types). Plugins will always be loaded in the order they are listed within their part. The parts are always loaded in the same sequence, that being
 1. core
-2. internal-local
-3. internal-remote
+2. internal
 4. external
 
 To define a plugin to get picked up by AIGIS, add a new line in the appropriate part. This line represents  
@@ -55,13 +54,14 @@ When providing a path to the local source of a plugin, AIGIS will *copy the prov
 <br>
 
 # Requirements
-AIGIS is tested under __*Python 3.7.3*__ on __*Linux/Fedora*__ and is compatible with all Linux and MacOS systems.
+AIGIS is tested under __*Python 3.7.3*__ on __*Linux/Fedora*__ and __*Linux/Ubuntu*__ and is compatible with all Linux and MacOS systems.
 
-Compatibility with Windows technically exists __if no internal-local__ plugins are present. This is due to Windows not supporting `os.fork` which is required to spawn properly contextualized environments via subprocessing. This is unlikely to ever change unless Bill gets his shit together and makes a decent OS.
+Compatibility with Windows is technically possible, however there are many tweaks to make to get it working and it is not a priority. This is unlikely to ever change unless Bill gets his shit together and makes a decent OS.
 
 AIGIS requires the following pip packages, as defined in `requirements.txt`:
 - `toml` >= 0.10.0
 - `pygit2` == 0.28.*
+- `multiprocess` == 0.*
 
 These are the requirements for running AIGIS on it's own. Plugins may have other requirements, both executable and through pip. Check your plugin's requirements before launching AIGIS to ensure they can be met.
 
@@ -84,67 +84,124 @@ Two files are necessary in order to define a core plugin: the plugin config file
 
 ### Aigis Core Injector File
 Since this functionality is injected directly into the central AIGIS module directly on runtime, there are a few important notes to make concerning their configuration.
-1. The File:
-The only restriction in the `AIGIS.core` file explicitely is that there exist a `SKILLS` __list type constant__. This constant functions very similarly to the `__all__` standard python constant and has essentially the same syntax: a list of strings denoting the names of the values that you want exposed from your module in the AIGIS core. ONLY the values in `SKILLS` will be exposed in the core.
-2. Logging:
+1. The File  
+The only restriction in the `AIGIS.core` file explicitely is that there exist a `SKILLS` __list type constant__. This constant functions very similarly to the `__all__` standard python constant and has essentially the same syntax: a list of strings denoting the names of the values that you want exposed from your module in the AIGIS core. ONLY the values in `SKILLS` will be exposed in the core. An example of a valid core injection file can be found at then end of this README.
+2. Logging  
 Since AIGIS uses a central logging system, it is expected that core plugins be compatible with it. When injecting the contents of the AIGIS.core file, AIGIS decorates every *callable* to pass an extra argument parameter, that being a configured and slightly edited version of a python logger. To properly track output in the centralized AIGIS system, it is expected that core plugins use this logger and not any of their own.
-3. Inter-core compatibility
-It is a reasonable expectation to be able to call other core modules from a specific plugin. In fact, not being able to do so would in many ways render the entire environment significantly less useful. While there is no way for a plugin itself to ensure that another exists, the whole of the core functionality injected from all plugins is stored within a designated namespace, that is to say `aigis`. So long as you are functioning within the main process (which should generally be the case, since no daemon-like attributes are allowed in core plugins), you can access the namespace in python simply by doing a simple `import aigis`. You will then be able to call any defined skills from loaded modules from that namespace (eg `aigis.backloggery.getFortuneCookie()`). Please be mindful of plugin load order when doing this however, as *namespace entries are not reserved before injection*. While it is not pythonic, it is suggested that imports on the AIGIS core be done at a class or function level, rather than at module level, if you are worried about load order.
+3. Inter-core compatibility  
+It is a reasonable expectation to be able to call other core modules from a specific plugin. In fact, not being able to do so would in many ways render the entire environment significantly less useful. While there is no way for a plugin itself to ensure that another exists, the whole of the core functionality injected from all plugins is stored within a designated namespace, that is to say `aigis`. So long as you are functioning within the main process (which should generally be the case, since no daemon-like attributes are allowed in core plugins), you can access the namespace in python by doing a simple `import aigis`. You will then be able to call any defined skills from loaded modules from that namespace (eg `aigis.backloggery.getFortuneCookie()`). Please be mindful of plugin load order when doing this however, as *namespace entries are not reserved before injection*. While it is not pythonic, it is suggested that imports on the AIGIS core be done at a class or function level, rather than at module level, if you are worried about load order and plan on importing only specific names.
 
 
 # Internal Type
-Internal plugins represent most of the active, visible, complex "functionality" of AIGIS. They are plugins that are long-running processes or other daemon-like programs that can interact with each other and with core plugins through AIGIS. There are two classes of internal plugins, __internal-local__ and __internal-remote__ and unfortunately they both act quite differently. This is to accomodate various possible environments that could be set. The main difference is that __internal-local__ plugins are run on the same host as AIGIS, whereas __internal-remote__ plugins can be run on any host, provided there is a two-way network connection between these hosts. For a more in-depth explanation on the implementational differences between internal-local and internal-remote plugin types, see the corresponding section.
+Internal plugins represent most of the active, visible, complex "functionality" of AIGIS. They are plugins that are long-running processes or other daemon-like programs that can interact with each other and with core plugins through AIGIS. 
 
-## Internal-Local Type
-Local internal plugins are services with daemon-like attributes that run on the same host as the central AIGIS core. These can be observers, pollers, watchers, or any other variation of such implementation. Of course, they can also do other things, but the AIGIS core will not ever natively make calls to internal plugins, so without some form of external input, they will be functionaly useless.
+Internal plugins are services with daemon-like attributes that can run on *any* host, *including but not limited to* the host running the AIGIS core. These can be observers, pollers, watchers, or any other variation of such implementation. Of course, they can also do other things, but the AIGIS core will not ever natively make calls to internal plugins, so without some form of external input, they will be functionaly useless.
 
-Since internal-local plugins are passed a runtime from the core, they must be written in the same language, at this moment Python __3.7.3__. While other, similar python versions may be compatible, specifically this version will be loaded on runtime.
+Internal plugins must be written in the same language, at this moment Python __3.7.3__. The processes handling internal plugins are always launched using the same Python interpreter as the one used to launch AIGIS (via `sys.executable`).
 
-### Configuring an Internal-Local Plugin
-Only the central AIGIS config file is *required* in order to configure an internal-local plugin.
+### Configuring an Internal Plugin
+Only the central AIGIS config file is *required* in order to configure an internal plugin.
 - `{root}/AIGIS/AIGIS.config`: A standard AIGIS config file. See the section on __Aigis Plugin Config File Options__.
 
 Optionally, it is very possible to want to also expose certain internal functionalities of internal plugins to the core, essentially forming a type of hybrid internal/core plugin. In these cases, a core injection file can also be provided.
 - `{root}/AIGIS/AIGIS.core`: Actually a python file defining the symbols for the functionality to be exposed.
 
-### Accessing the AIGIS Core from Internal-Local Plugins
-AIGIS would be a pretty useless system if none of its functional code could interact with the core plugins. It is in fact internal plugins that offer the biggest active functionality that can be considered an integrated system. Since internal-local plugins are guarenteed run on the same host as the core, this is done by passing a reference to the AIGIS core when entering the launch point of the plugin. The upside to this is mainly seen in performance. The core is by all means copied into the runtime of the plugin, allowing for O(1) lookup in a pre-indexed namespace, and the runtime functionality of the process remains entirely the same. The downside is precisely that the runtime is *copied* into the plugin's, which means that plugin cannot benefit from offloading certain potentially heavy procedures to a scalable remote system. Internal-local plugins must optimize calls made to the core themselves, since else everything will be processed in that plugin's runtime. The core reference can be accessed via importation, so `import aigis`.
-
-
-## Internal-Remote Type
-Remote internal plugins are services with daemon-like attributes that can run on *any* host, *including but not limited to* the host running the AIGIS core. These can be observers, pollers, watchers, or any other variation of such implementation. Of course, they can also do other things, but the AIGIS core will not ever natively make calls to internal plugins, so without some form of external input, they will be functionaly useless.
-
-Internal-remote plugins must be written in the same language, at this moment Python __3.7.3__. Since internal-remote plugins are *not* passed a runtime from the core, they do not necessarilly have to strictly adhere to the same python version as the core. It is still recommended that the same version be used, however, since the process launch needs to be wrapped in order to offer the correct environment, and this wrapper may not be compatible with all python version (only tested with core version).
-
-### Configuring an Internal-Remote Plugin
-Only the central AIGIS config file is *required* in order to configure an internal-remote plugin.
-- `{root}/AIGIS/AIGIS.config`: A standard AIGIS config file. See the section on __Aigis Plugin Config File Options__.
-
-Optionally, it is very possible to want to also expose certain internal functionalities of internal plugins to the core, essentially forming a type of hybrid internal/core plugin. In these cases, a core injection file can also be provided. It is important to note that resources cannot be shared between these injected sources and the runtime of the remote plugin.
-- `{root}/AIGIS/AIGIS.core`: Actually a python file defining the symbols for the functionality to be exposed.
-
-### Accessing the AIGIS Core from Internal-Remote Plugins
-AIGIS would be a significantly less useful system if it could not share its registered core functionality accross plugins running on remote hosts. It is almost undoubtably via internal-remote plugins that users would be able to interact with AIGIS and gain from its centralized information sourcing features. Since internal-remote plugins are not *guarenteed* to run on the same host as the AIGIS core, the system must simulate an environment containing AIGIS, and forward the runtime requests to the core over the network. We refer to the AIGIS exposed in the remote plugin's runtime environment as the AigisProxy. Strictly speaking, the AigisProxy is an infinitely recursive namespace, which forwards calls to the true AIGIS core via a type of XMLRPC. While the exact implementation details aren't suppose to be relevent, this results in a slightly different exposure to the core on runtime.
+### Accessing the AIGIS Core from Internal Plugins
+AIGIS would be a significantly less useful system if it could not share its registered core functionality accross plugins running on remote hosts. It is undoubtably via internal plugins that users would be able to interact with AIGIS and gain from its centralized information sourcing features. Since internal plugins are not *guarenteed* to run on the same host as the AIGIS core, the system must simulate an environment containing AIGIS, and forward the runtime requests to the core over the network. We refer to the AIGIS exposed in the remote plugin's runtime environment as the AigisProxy. Strictly speaking, the AigisProxy is an infinitely recursive namespace, which forwards calls to the true AIGIS core via a type of RPC. While the exact implementation details aren't suppose to be relevent, this results in a slightly different exposure to the core on runtime.
 
 #### At Its Core
-Access to AIGIS in internal-remote plugins is represented as a module, and is called via `import aigis`.
+Access to AIGIS in internal plugins is represented as a module, and is called via `import aigis`.
 
 #### The Downside
-There are a few important conditions to take into account when calling the core from internal-remote plugins, namely
-1. You can only import the top-level module.
+There are a few important conditions to take into account when calling the core from internal plugins, namely
+1. *You can only import the top-level module*  
 So you can do `import aigis`, but not `from aigis import amodule` or `import aigis.amodule`. This is because the `aigis` module itself is the AigisProxy which itself does not contain any of the real core's modules itself. Making references in code to `aigis.amodule` outside of the import will only send the request to the true core to evaluate that statement per say.
-2. Everything must be called.
-Including constants. The correct way to retrieve the constant integer `MAX_NAME_LENGTH` from the registered module `my_database` is by doing
+2. *Everything must be called, including constants*  
+The correct way to retrieve the constant integer `MAX_NAME_LENGTH` from the registered module `my_database` is by doing
 ```python
 import aigis
 
 MAX_NAME_LENGTH = aigis.my_database.MAX_NAME_LENGTH()
 ```
-3. Limited return types
-If the core function you are calling returns an object that cannot be pickled, an error will be raised. This is because it is nearly impossible to properly mock class instances across python processes, and not supported for many other return types. The number of supported types may increase in the future, but for now you should consult the official list of types supported by the built-in `pickle` module in the python doc. It is up to core plugins to return something that can be pickled, if such calls are expected to come from internal-remote plugins.
+3. *Limited return types*  
+If the core function you are calling returns an object that cannot be serialized, an error will be raised. Thanks to the amazing work done by the `dill` and `multiprocess` packages, almost all Python objects, including classes, functions, lambdas and more are all serializable. According to the `dill` documentation, the only types not supported for serialization are [frame, generator and traceback](https://github.com/uqfoundation/dill).
+
+### **Important Notes Concerning Internal-Core Plugin Interaction**
+Since it's not necessarily obvious, this section simply servers to shed some light on what can and can't be done when sharing data and functionality accross plugins.
+
+There are two parts to take into account. First of all what functionality can be *exposed*? The simple answer is everything. Any possible functionality, including code related to frames, generators and tracebacks mentioned above, can be called accross process. AIGIS does some magic behind the scenes to make sure that any call made from another process ends up being evaluated *in the core process*. Since core plugins are loaded directly into the core process, this means they are run in a very standard manner, having access to the full scope of their runtimes.
+
+The keyword there is scope, which carries over to part two. What can be *returned/shared* accross processes? Dill of course explicitely states that frames, generators and tracebacks cannot be serialized (due to relience on the GIL, which I personally know very little about), so those types are, of course, impossible to share. This also means any object or namespace containing these kinds of objects cannot be shared, since they can also not be serialized.  
+(As a side note, custom exception types and Exception class objects are still properly raised accross processes. It is only the traceback that cannot be shared, making proper error logging important.)  
+Where the scope comes into play is that it is very important to remember that only the *local scope of the returned object* gets serialized. If, for example, a function or class refers at some point to a value that is defined outside of itself, attempting to use that in the subprocess will result in an **`NameError`** if that name is not also defined in the scope of the caller. Some examples:
+```python
+OUT_OF_SCOPE = ""
+
+<SCOPE> 
+        --> def afunction():
+        -->     in_scope = 3
+        -->     print(in_scope)
+        -->     print(OUT_OF_SCOPE)
+</SCOPE>
+
+def get_afunction():  # Expose to AIGIS core
+    return afunction
+
+# In the subprocess
+>>> import aigis
+>>> local_afunction = aigis.get_afunction()
+>>> local_afunction()
+3
+Traceback (most recent call last):
+  [...]
+  File "<stdin>", line 4, in afunction
+NameError: name 'OUT_OF_SCOPE' is not defined
+>>>
+```
+If these names are assigned values in the subprocess though, it will work without issue. This should generally be avoided however.
+```python
+REPLACE_ME = "Don't use this value!"
+
+<SCOPE> 
+        --> def afunction():
+        -->     inscope = 3
+        -->     print(inscope)
+        -->     print(REPLACE_ME)
+</SCOPE>
+
+def get_afunction():  # Expose to AIGIS core
+    return afunction
+
+# In the subprocess
+>>> import aigis
+>>> local_afunction = aigis.get_afunction()
+>>> REPLACE_ME = "Use this one!"
+>>> local_afunction()
+3
+Use this one!
+>>> 
+```
+Again, this is only applicable when `afunction` is *returned by the core and called in the remote process*. If it is called in the core directly, there is no problem.
+```python
+OUT_OF_SCOPE = "Totally fine"
+
+<SCOPE> 
+        --> def afunction():  # Expose to AIGIS core
+        -->     inscope = 3
+        -->     print(inscope)
+        -->     print(OUT_OF_SCOPE)
+</SCOPE>
+
+# In the subprocess
+# Since it is called in the core process, messages are printed to the core process stdout
+>>> import aigis
+>>> aigis.afunction()
+>>> 
+```
+
 
 ## Why Do It This Way?
-Generally speaking, and as silly as it sounds, this method was chosen so that the syntaxical manner in which the core is accessed remains the same across all plugin types (the `import aigis` syntax). It makes it a lot easier to toggle a plugin's type between internal-local and internal-remote depending on needs or performance issues. It also helps the core potentially optimize internal-remote plugins that happen to be running on the same host as the core, though this is not implemented. The alternative would be in the vein of automatically spinning up a REST API service based on registered core plugins, but this would require much greater core plugin configuration and offer less freedom, along with ultimately still creating a number of downsides, namely requiring an HTTP module like `requests` in each internal-remote plugin and having to standardize return types specifically to JSON or another predetermined format.
+Generally speaking, and as silly as it sounds, this method was chosen so that the syntaxical manner in which the core is accessed remains the same across all plugin types (the `import aigis` syntax). The alternative would be in the vein of automatically spinning up a REST API service based on registered core plugins, but this would require much greater core plugin configuration and offer less freedom, along with ultimately still creating a number of downsides, namely requiring an HTTP module like `requests` in each internal plugin and having to standardize return types specifically to JSON or another predetermined format.
 
 
 # External Type
@@ -165,28 +222,22 @@ The config file to place in each plugin's repo shares a common format across all
 | Option Name          | Required | Type             | Description |
 |:--------------------:|:--------:|:----------------:|-------------|
 | PLUGIN_TYPE          | YES      | string           | The plugin's type. Obviously required everywhere. |
-| ENTRYPOINT           | YES      | path             | The working directory in which to evaluate anything from this plugin. For internal and external plugins, this will be the working directory set when running the subprocess. For core plugins it is used to make sure relative imports are functional. |
+| ENTRYPOINT           | YES      | path             | The working directory in which to evaluate anything from this plugin. For internal and external plugins, this will be the working directory set when running the subprocess. For core plugins it is used to make sure imports are functional. |
 | SYSTEM_REQUIREMENTS  | NO       | list[string]     | Anything which needs to be installed on the system in order for this plugin to run properly. While it is good practice to state it explicitely, it can be assumed that `python3.7` is available at all times. |
 | REQUIREMENTS_COMMAND | NO       | string           | Command to run *in shell* of the host to install language/runtime specific requirements. For python, for example, it will generally be some form of `pip install -r` |
-| REQUIREMENTS_FILE    | NO       | path             | File containing list of language-specific package requirements. it is assumed that all languages have a way of loading and installing a list of requirements from a file. |
+| REQUIREMENTS_FILE    | NO       | path             | File containing list of language-specific package requirements. It is assumed that all languages have a way of loading and installing a list of requirements from a file. |
 | SECRETS              | NO       | map[string:path] | Set of secret files to copy from the central AIGIS secret dump to local environments. |
 | RESTART              | NO       | int              | Number of times to attempt to restart the plugin if it fails. If RESTART is not defined at all, it will never attempt to restart the plugin. Note that this option is available for core plugins, but generally will not make sense as there should be nothing in a core plugin that requires a "restart" or that would make it "crash". |
 
 
-## INTERNAL-REMOTE AND EXTERNAL PLUGINS ONLY
+## INTERNAL AND EXTERNAL PLUGINS ONLY
+Both internal and external plugins use a required parameter called `LAUNCH`. While in both cases it represents the programatical starting point of the application, what that is vairies depending on if it's an internal or external plugin.
 
 | Option Name | Required | Type    | Description |
 |:-----------:|:--------:|:-------:|-------------|
-| HOST        | YES      | string  | Host on which to run this plugin. Can be `localhost` if desired, of course. |
-
-
-## INTERNAL-LOCAL, INTERNAL-REMOTE AND EXTERNAL PLUGINS
-Both internal and external plugins use a required parameter called `LAUNCH`. While in both cases it represents the programatical starting point of the application, what that is vairies depending on if it's an internal or external plugin.
-
-| Option Name          | Required | Type         | Description |
-|:--------------------:|:--------:|:------------:|-------------|
+| HOST        | NO      | string  | Host on which to run this plugin. Can be `localhost` if desired. Defaults to `localhost`. |
 | LAUNCH (EXTERNAL)    | YES      | list[string] | A list of arguments aggregated and executed in the host's command line in order to launch the plugin. For example, `["my_plugin.exe", "-r", "1920"]`. Note that the working directory of the command is set by the ENTRYPOINT required option. | 
-|LAUNCH (INTERNAL)     | YES      | path         | Path to the Python file containing the plugin's launch function. This function __*MUST* have the signature__ `def launch(log)`, where `log` will be the logger passed from the centralized logging platform to be used. Anything sent to `stdout` or `stderr` will also automatically be logged using that logger handle. |
+|LAUNCH (INTERNAL)     | YES      | module name         | Importable sequence to the Python file containing the plugin's launch function, relative to the ENTRYPOINT given (used to import the launch file, eg `main` -> `import main`). The function __*MUST* have the signature__ `def launch()`. Anything sent to `stdout` or `stderr` will be automatically captured and logged. |
 
 
 ## Config File Perks
@@ -197,7 +248,7 @@ Secrets are an important part of securing any application. To avoid having to co
 
 Secrets should be placed *on local disk* in the directory `secrets/<plugin_name>` at the *top level* of the AIGIS code, where `<plugin_name>` is the name set in the AIGIS configuration file (found in `config/config.aigis`). These secrets can be copied on runtime to a location within the plugin's source code using the SECRETS config option detailed above.
 
-### {root}
+### `{root}`
 Plugins are all loaded into a certain place on runtime that isn't necessarily apparent to the config file author. Since many parameters expect path-like entries, the keyword `{root}` is formatted with the local path on disk leading to the plugin. So for example to get to the `src` file of a plugin with an internal structure of `python/AIGIS/src.py`, you can specify `{root}/python/AIGIS/src.py`. This is only done on certain specific configuration options, since many do/should not require it. The supported options for `{root}` are:
 - ENTRYPOINT
 - REQUIREMENTS_FILE
@@ -205,7 +256,7 @@ Plugins are all loaded into a certain place on runtime that isn't necessarily ap
 - LAUNCH (applicable for internal plugins)
 
 ### `cleanup`
-Certain plugins may understandably have some more complex resources loaded in order to provide more complex services. In this case, it's important to be able to specify a certain way of liberating these resources in the event that AIGIS is shut down while these resources are in use. To do this, a special keyword is processed when loading *core* functionalities (from both core plugins and internal-local plugins with core hooks). That keyword is `cleanup`. When a core file defines the skill `cleanup`, the value will be registered internally to the AIGIS system and called on program exit. If it does not exist, no cleanup will be done outside the usual Python resource closure. Note that cleanup is expected to be a function and will be *called* on exit. Test these function thoroughly, as their failure may have serious unwanted effects.
+Certain plugins may understandably have some more complex resources loaded in order to provide more complex services. In this case, it's important to be able to specify a certain way of liberating these resources in the event that AIGIS is shut down while these resources are in use. To do this, a special keyword is processed when loading *core* functionalities (from both core plugins and internal plugins with core hooks). That keyword is `cleanup`. When a core file defines the skill `cleanup`, the value will be registered internally to the AIGIS system and called on program exit. If it does not exist, no cleanup will be done outside the usual Python resource closure. Note that cleanup is expected to be a function and will be *called* on exit. Test these function thoroughly, as their failure may have serious unwanted effects.
 
 
 # Example Config Files
@@ -233,23 +284,22 @@ import mymodule.somecode as coolstuff
 SKILLS = ["coolstuff.firstcoolthing", "coolstuff.secondcoolthing"]
 ```
 
-## For Internal-Local Plugin
+## For Internal Plugin
+### AIGIS.config
 ```python
-PLUGIN_TYPE = "internal-local"
+PLUGIN_TYPE = "internal"
 ENTRYPOINT = "{root}"
-LAUNCH = "{root}/main.py"
+LAUNCH = "main"
 
-SYSTEM_REQUIREMENTS = ["pip3.7"]
+SYSTEM_REQUIREMENTS = ["pip3.7", "ffmpeg"]
 
-REQUIREMENT_COMMAND = "pip3.7 install -r"
+REQUIREMENT_COMMAND = "pip3.7 install --user --index-url https://pypi.python.org/simple -r"
 REQUIREMENT_FILE = "{root}/requirements.txt"
 
 SECRETS = {
-    ".secrets.toml": "{root}/src/db/",
+    "super.secret": "{root}/secrets/gcreds/"
 }
 ```
-
-## For Internal-Remote Plugin
 
 ## For External Plugin
 ### AIGIS.config

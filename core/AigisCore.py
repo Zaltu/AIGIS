@@ -10,7 +10,7 @@ from plugins.core.Skills import Skills
 from diary.LogManager import LogManager
 from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 
-_PLUGIN_TYPES = ["core", "internal-local", "internal-remote", "external"]
+_PLUGIN_TYPES = ["core", "internal", "external"]
 
 class Aigis():
     """
@@ -37,6 +37,10 @@ class Aigis():
         self.skills = Skills()
         # Expose the core skills object as importable module in order to meme the python syntax
         sys.modules["aigis"] = self.skills
+
+        # Before plugins are even loaded, expose the core skills server
+        from proxinator import _aigis
+        _aigis.CORE_SERVER.start()
 
         # Launch the plugin manager
         LOG.boot("Launching plugin manager...")
