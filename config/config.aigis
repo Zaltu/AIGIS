@@ -5,6 +5,7 @@
 backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 dnd = "https://github.com/zaltu/dnd-utils.git"
 translate = "https://github.com/zaltu/translation-utils.git"
+genesis = "https://github.com/Zaltu/content-generator.git"
 
 [internal]
 madbot = "https://github.com/zaltu/mad-bot.git"
