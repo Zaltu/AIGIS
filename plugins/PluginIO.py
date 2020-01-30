@@ -195,8 +195,6 @@ class CoreIO(PluginIO):
         """
         Fully kill the core plugin by removing all it's references in the core skills object then request
         the manager to reload it.
-        WARNING that this won't update the available libraries in internal or external plugins unless they
-        too are reloaded, since the references are sourced on launch.
 
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
@@ -382,10 +380,10 @@ def _stop(plugin):
     # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
     # and then the task may not finish.
     start = time.time()
-    while plugin._ext_proc.returncode == None and time.time()-start > 5:
+    while plugin._ext_proc.returncode is None and time.time()-start > 5:
         time.sleep(0.01)
 
-    if plugin._ext_proc == None:
+    if plugin._ext_proc is None:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
 

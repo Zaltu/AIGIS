@@ -3,7 +3,6 @@ Helper module to hold and organize loaded plugins.
 """
 import os
 import shutil
-import asyncio
 import traceback
 import subprocess
 
