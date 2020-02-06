@@ -1,3 +1,4 @@
 toml==0.10.0
 pygit2==0.28.*
-multiprocess==0.*
+git+https://github.com/Zaltu/dill.git
+multiprocess==0.70.9
