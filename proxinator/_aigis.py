@@ -31,6 +31,9 @@ class AIGISpseq():
             toret = toret(*args, **kwargs)
         elif args or kwargs:
             raise TypeError("Too many arguments:\n%s\n%s" % (args, kwargs))
+        # This allows the custom dill package to properly regenerate all the needed properties client-side
+        if type(toret).__module__ != "builtins":
+            type(toret).__module__ = "__main__"
         return toret
 
 
