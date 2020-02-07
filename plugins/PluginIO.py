@@ -3,7 +3,6 @@ Process AIGIS plugin.
 """
 import os
 import sys
-import time
 import shutil
 import asyncio
 import subprocess
@@ -14,8 +13,13 @@ from plugins.external.WatchDog import jiii
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 
-# Get asyncio event loop for subprocess management
+# Setup the asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
+ALOOP_FOREVER = Thread(target=ALOOP.run_forever, daemon=True)
+ALOOP_FOREVER.start()
+
+# Max number of seconds to launch a plugin.
+PLUGIN_LAUNCH_TIMEOUT = 10
 
 class PluginIO():
     """
@@ -233,11 +237,13 @@ class InternalLocalIO(PluginIO):
         Internal-local implementation of run.
         Spawns a subprocess and instanciates that python environment to include the core_skills singleton to
         expose all the core functionality in the subprocess. Also maintains a watchdog thread that monitors
-        for the process to exit. The stdout/err of the subprocess is NOT captured, but an AIGIS logging
-        object is passed to the subprocess environment for use.
+        for the process to exit. The stdout/err of the subprocess is captured and piped to the plugin's log's
+        filehandler.
 
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
+
+        :raises PluginLaunchTimeoutError: if plugin fails to launch within the timeout value
         """
         core_file = _prep_core_injector_file(plugin)
         if core_file:
@@ -251,9 +257,14 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))  # TODO this is completely busted
+        run_future = asyncio.ensure_future(InternalLocalIO._run_internal(plugin), loop=ALOOP)
+        try:
+            run_future.result()
+        except asyncio.TimeoutError:
+            run_future.cancel()
+            raise PluginLaunchTimeoutError("%s taking too long to execute... Cancelling." % plugin.name)
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
+        _threaded_async_process_wait(plugin, manager)
 
     @staticmethod
     def reload(plugin, manager):
@@ -322,7 +333,7 @@ class ExternalIO(PluginIO):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        ALOOP.run_until_complete(ExternalIO._run_external(plugin))
+        ALOOP.run_until_complete(ExternalIO._run_external(plugin))  # TODO busted
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
 
@@ -371,19 +382,14 @@ def _stop(plugin):
     :param AigisPlugin plugin: the plugin to stop
     """
     try:
-        asyncio.ensure_future(plugin._ext_proc.terminate())
+        kill_future = asyncio.ensure_future(plugin._ext_proc.terminate(), loop=ALOOP)
     except ProcessLookupError:
         # Process already dead. Probably exited earlier.
         return
 
-    # This chunk is necessary because Python async FUCKING SUCKS
-    # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
-    # and then the task may not finish.
-    start = time.time()
-    while plugin._ext_proc.returncode is None and time.time()-start > 5:
-        time.sleep(0.01)
-
-    if plugin._ext_proc is None:
+    try:
+        kill_future.result(5)
+    except asyncio.TimeoutError:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
 
@@ -396,7 +402,7 @@ def _threaded_async_process_wait(plugin, manager):
     :param AigisPlugin plugin: the external plugin to wait for.
     :param PluginManager manager: this instance's PluginManager
     """
-    ALOOP.run_until_complete(jiii(plugin, manager))
+    asyncio.ensure_future(jiii(plugin, manager), loop=ALOOP)
 
 
 def _prep_core_injector_file(plugin):
@@ -439,4 +445,9 @@ class MissingSecretFileError(exc_utils.PluginLoadError):
 class InvalidPluginTypeError(exc_utils.PluginLoadError):
     """
     Error when plugin config has an unsupported type or is not configured for it's type.
+    """
+
+class PluginLaunchTimeoutError(exc_utils.PluginLoadError):
+    """
+    Error for when the plugin is taking too long to launch.
     """
