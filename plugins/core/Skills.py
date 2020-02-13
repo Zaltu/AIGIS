@@ -120,9 +120,9 @@ def decorator(f, log):
         not supporting the "log" parameter
         """
         try:
-            return f(*args, log=log, **kwargs)
+            return f(*args, logger=log, **kwargs)
         except TypeError as e:
-            if "unexpected keyword argument 'log'" in str(e):
+            if "unexpected keyword argument 'logger'" in str(e):
                 log.warning("Function %s called without AIGIS logging...", str(f))
                 return f(*args, **kwargs)
             raise
