@@ -3,6 +3,7 @@ Process AIGIS plugin.
 """
 import os
 import sys
+import time
 import shutil
 import asyncio
 import subprocess
@@ -257,12 +258,7 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        run_future = asyncio.ensure_future(InternalLocalIO._run_internal(plugin), loop=ALOOP)
-        try:
-            run_future.result()
-        except asyncio.TimeoutError:
-            run_future.cancel()
-            raise PluginLaunchTimeoutError("%s taking too long to execute... Cancelling." % plugin.name)
+        asyncio.new_event_loop().run_until_complete(InternalLocalIO._run_internal(plugin))
         plugin.log.boot("Running...")
         _threaded_async_process_wait(plugin, manager)
 
@@ -382,14 +378,19 @@ def _stop(plugin):
     :param AigisPlugin plugin: the plugin to stop
     """
     try:
-        kill_future = asyncio.ensure_future(plugin._ext_proc.terminate(), loop=ALOOP)
+        asyncio.ensure_future(plugin._ext_proc.terminate())
     except ProcessLookupError:
         # Process already dead. Probably exited earlier.
         return
 
-    try:
-        kill_future.result(5)
-    except asyncio.TimeoutError:
+    # This chunk is necessary because Python async FUCKING SUCKS
+    # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
+    # and then the task may not finish.
+    start = time.time()
+    while plugin._ext_proc.returncode is None and time.time()-start > 5:
+        time.sleep(0.01)
+
+    if plugin._ext_proc.returncode is None:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
 
