@@ -319,3 +319,19 @@ SECRETS = {
     "connection_token.secret": "{root}/src/db/"
 }
 ```
+
+# Testing
+Considering AIGIS is a distributed system, testing multiple dependencies can seem rather difficult, and it is indeed a little non-standard. Since multiple core plugins could rely on each other, and setting up a simulated environment with all the path management done by AIGIS is quite a pain, the best way to test AIGIS plugins is by spinning up a test AIGIS instance, loading only the plugins needed to test.
+
+This can still be a problem when testing core plugins however. Since by design they have no interactivity, there must be at least one internal plugin in order to test the behavior of core plugins. So that there's no need to create a personalized internal plugin just for testing, AIGIS provides a default, AIGIS compliant terminal solution for loading the active AIGIS environment into any interpreter session. Simply import the `AIGISTerminal` file found in `tests`, then import `aigis`.
+
+```bash
+zaltu@mercy tests $ python3.7
+Python 3.7.3 (default, May 13 2019, 11:43:03) 
+[GCC 4.8.5 20150623 (Red Hat 4.8.5-16)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import AIGISTerminal
+>>> import aigis
+>>> aigis.backloggery.getFortuneCookie("zaltu")
+'Time to play some God of War III (PS4), my dude!'
+```
