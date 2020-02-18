@@ -145,7 +145,7 @@ class PluginIO():
     @staticmethod
     def reload(plugin, manager):
         """
-        This plugin exposes an aigis.<module>.AIGISreload function in the aigis core module for each plugin.
+        This plugin exposes an aigis.AIGISreload function in the aigis core module.
         This allows plugins to be reloaded (and potentially updated) without needing to have the "restart"
         option selected. Since it's difficult/impossible to crash core plugins as well, this is done from
         here.
@@ -258,9 +258,10 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        asyncio.new_event_loop().run_until_complete(InternalLocalIO._run_internal(plugin))
+        tmp_loop = asyncio.new_event_loop()
+        tmp_loop.run_until_complete(InternalLocalIO._run_internal(plugin))
         plugin.log.boot("Running...")
-        _threaded_async_process_wait(plugin, manager)
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager, tmp_loop), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -331,7 +332,7 @@ class ExternalIO(PluginIO):
         """
         ALOOP.run_until_complete(ExternalIO._run_external(plugin))  # TODO busted
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager, ALOOP), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -395,15 +396,16 @@ def _stop(plugin):
         plugin._ext_proc.kill()
 
 
-def _threaded_async_process_wait(plugin, manager):
+def _threaded_async_process_wait(plugin, manager, loop):
     """
     Launch the Watchdog for this plugin's process.
     Can only be called on an external plugin.
 
     :param AigisPlugin plugin: the external plugin to wait for.
     :param PluginManager manager: this instance's PluginManager
+    :param AbstractEventLoop loop: the tmp generated event loop to run the watcher in
     """
-    asyncio.ensure_future(jiii(plugin, manager), loop=ALOOP)
+    loop.run_until_complete(jiii(plugin, manager))
 
 
 def _prep_core_injector_file(plugin):
