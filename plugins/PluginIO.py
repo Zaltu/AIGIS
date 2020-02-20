@@ -160,12 +160,13 @@ class PluginIO():
         )
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager):
         """
         Stop the plugin in as non-violent a way as possible.
-        Only implemented on process-reliant plugins, since they are the ones that need stopped.
+        Does not handle what kind of retry, if any, is attempted on burial.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: the plugin manager, for burial if needed
         """
 
 class CoreIO(PluginIO):
@@ -203,6 +204,17 @@ class CoreIO(PluginIO):
 
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
+        """
+        plugin.reload = True
+        CoreIO.stop(plugin, manager)
+
+    @staticmethod
+    def stop(plugin, manager):
+        """
+        Unregister the skills of the core plugin and tell the manager to bury it.
+
+        :param AigisPlugin plugin: plugin to stop
+        :param PluginManager manager: manager singleton for burial
         """
         import aigis as core_skills # AigisCore.skills
         core_skills._AIGISforgetskill(
@@ -274,6 +286,7 @@ class InternalLocalIO(PluginIO):
 
         :raises AttributeError: if the plugin has no internal process attached to it
         """
+        plugin.reload = True
         try:
             plugin._ext_proc.kill()
         except AttributeError as e:
@@ -299,11 +312,13 @@ class InternalLocalIO(PluginIO):
         )
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager=None):
         """
         Stop the plugin in as non-violent a way as possible.
+        Killing the plugin will automatically cause the manager to bury it, so no need to do so manually.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: unused, but required by parent
         """
         _stop(plugin)
 
@@ -362,11 +377,13 @@ class ExternalIO(PluginIO):
                                                                 cwd=plugin.config.ENTRYPOINT)
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager=None):
         """
         Stop the plugin in as non-violent a way as possible.
+        Killing the plugin will automatically cause the manager to bury it, so no need to do so manually.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: unused, but required by parent
         """
         _stop(plugin)
 
