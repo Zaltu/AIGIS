@@ -33,18 +33,18 @@ class Aigis():
         LOG.boot("Launching global logging service...")
         self.log_manager = LogManager()
 
+        # Launch the plugin manager
+        LOG.boot("Launching plugin manager...")
+        self.plugins = PluginManager()
+
         # Launch the core skill system container
-        self.skills = Skills()
+        self.skills = Skills(self.plugins)
         # Expose the core skills object as importable module in order to meme the python syntax
         sys.modules["aigis"] = self.skills
 
         # Before plugins are even loaded, expose the core skills server
         from proxinator import _aigis
         _aigis.CORE_SERVER.start()
-
-        # Launch the plugin manager
-        LOG.boot("Launching plugin manager...")
-        self.plugins = PluginManager()
 
         # Load all plugins in order
         for ptype in _PLUGIN_TYPES:

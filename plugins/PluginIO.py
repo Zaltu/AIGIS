@@ -223,7 +223,7 @@ class CoreIO(PluginIO):
             ),
             plugin
         )
-        plugin.log.boot("Skills deregistered.")
+        plugin.log.shutdown("Skills deregistered.")
         manager.bury(plugin)
 
 

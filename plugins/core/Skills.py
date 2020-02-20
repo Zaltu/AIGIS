@@ -56,14 +56,19 @@ class Skills():
         :param module mod: module who's functionality to port
         :param AigisPlugin plugin: this AigisPlugin
         """
+        top_level_removed = []
         for name in mod.SKILLS:
             pseq = name.split(".")
+            if pseq[0] in top_level_removed:
+                plugin.log.debug("Name %s deregistered by pruning.", name)
+                continue
             try:
                 delattr(self, pseq[0])
+                top_level_removed.append(pseq[0])
             except AttributeError:
-                plugin.log.error("Attempted to deregister %s, which cannot be found in the core.", name)
+                plugin.log.error("Attempted to deregister %s, which cannot be found in the core.", pseq[0])
                 continue
-            plugin.log.warning("Deregistered %s...", name)
+            plugin.log.warning("Deregistered %s and everything downstream.", pseq[0])
 
     def _AIGISrecurdict(self, mod, pseq, i, ns, log):
         """
