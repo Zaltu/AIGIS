@@ -45,7 +45,7 @@ Plugins can be pulled from two different locations, a public Github HTTPS clone 
 When using a source from github, the specified repo is cloned to the "root" of the plugin's runtime location. Essentially the equivalent of a `git clone` in the directory AIGIS uses to store plugins locally on runtime. AIGIS will always clone the *master branch* of the specified repo. If a plugin has already been cloned in the past, AIGIS will recognize this and attempt the equivalent of a `git fetch` on the cloned repo. If for any reason this fetch fails, it *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
 
 ### Local Source
-When providing a path to the local source of a plugin, AIGIS will *copy the provided directory* into the plugin's expected runtime location. This is to say that it will __not__ used the location in which the source is provided on runtime. The exact implementation of this is done via `shutil.copytree`, *using default options*. This means symlinks will be followed, permissions will be copied and so on (see the full doc of [shutil.copytree](https://docs.python.org/3.7/library/shutil.html#shutil.copytree) for more info). Should the source already exist in the runtime location, AIGIS will recognize this *and assume the plugin is already present*. Since there is no equivalent function of a `git fetch` for local files, and `shutil.copytree`'s implementation is kinda suck, it will not attempt to update or overwrite the code. This *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
+When providing a path to the local source of a plugin, AIGIS will *copy the provided directory* into the plugin's expected runtime location. This is to say that it will __not__ use the location in which the source is provided on runtime. The exact implementation of this is done via `shutil.copytree`, *using default options*. This means symlinks will be followed, permissions will be copied and so on (see the full doc of [shutil.copytree](https://docs.python.org/3.7/library/shutil.html#shutil.copytree) for more info). Should the source already exist in the runtime location, AIGIS will recognize this *and assume the plugin is already present*. Since there is no equivalent function of a `git fetch` for local files, and `shutil.copytree`'s implementation is kinda suck, it will not attempt to update or overwrite the code. This *is not considered an error*. A warning will be logged, noting the plugin could not be updated properly, but it will continue its attempt to load the plugin.
 
 <br>
 
@@ -61,6 +61,7 @@ Compatibility with Windows is technically possible, however there are many tweak
 AIGIS requires the following pip packages, as defined in `requirements.txt`:
 - `toml` >= 0.10.0
 - `pygit2` == 0.28.*
+- `zaltu/dill` == github.com/zaltu/dill
 - `multiprocess` == 0.*
 
 These are the requirements for running AIGIS on it's own. Plugins may have other requirements, both executable and through pip. Check your plugin's requirements before launching AIGIS to ensure they can be met.
@@ -131,7 +132,7 @@ Since it's not necessarily obvious, this section simply servers to shed some lig
 
 There are two parts to take into account. First of all what functionality can be *exposed*? The simple answer is everything. Any possible functionality, including code related to frames, generators and tracebacks mentioned above, can be called accross process. AIGIS does some magic behind the scenes to make sure that any call made from another process ends up being evaluated *in the core process*. Since core plugins are loaded directly into the core process, this means they are run in a very standard manner, having access to the full scope of their runtimes.
 
-The keyword there is scope, which carries over to part two. What can be *returned/shared* accross processes? Dill of course explicitely states that frames, generators and tracebacks cannot be serialized (due to relience on the GIL, which I personally know very little about), so those types are, of course, impossible to share. This also means any object or namespace containing these kinds of objects cannot be shared, since they can also not be serialized.  
+The keyword there is scope, which carries over to part two. What can be *returned/shared* accross processes? Dill explicitely states that frames, generators and tracebacks cannot be serialized (due to relience on the GIL, which I personally know very little about), so those types are, of course, impossible to share. This also means any object or namespace containing these kinds of objects cannot be shared, since they can also not be serialized.  
 (As a side note, custom exception types and Exception class objects are still properly raised accross processes. It is only the traceback that cannot be shared, making proper error logging important.)  
 Where the scope comes into play is that it is very important to remember that only the *local scope of the returned object* gets serialized. If, for example, a function or class refers at some point to a value that is defined outside of itself, attempting to use that in the subprocess will result in an **`NameError`** if that name is not also defined in the scope of the caller. Some examples:
 ```python
@@ -207,7 +208,7 @@ Generally speaking, and as silly as it sounds, this method was chosen so that th
 # External Type
 External plugins are plugins that run completely independently of the core and do not require any of its features in order to work. When a plugin is developped without any dependencies on other plugins, it can generally be considered an external plugin.
 
-External plugins can do more or less anything, as they are poped open in a completely independent subprocess. This includes being in a different language than even python. The only integration for external plugins provided by AIGIS natively is piping the logs (pulled from stdout and stderr) of the subprocess into AIGIS's central logging system, and optionally restarting on process exit or failure __TODO__. Because of that, despite being independent, they still require an AIGIS config file like any other plugin type.
+External plugins can do more or less anything, as they are poped open in a completely independent subprocess. This includes being in a different language than even python. The only integration for external plugins provided by AIGIS natively is piping the logs (pulled from stdout and stderr) of the subprocess into AIGIS's central logging system, and optionally restarting on process exit or failure. Because of that, despite being independent, they still require an AIGIS config file like any other plugin type.
 
 __Note__  
 While the AIGIS core does not offer any native support for exchanging data between external plugins, it would be very feasible to create an internal plugin that acts as a REST or other endpoint for the explicit purpose of exposing certain core functionalities to other languages. This is far beyond the scope of the core mainframe however.
@@ -257,6 +258,23 @@ Plugins are all loaded into a certain place on runtime that isn't necessarily ap
 
 ### `cleanup`
 Certain plugins may understandably have some more complex resources loaded in order to provide more complex services. In this case, it's important to be able to specify a certain way of liberating these resources in the event that AIGIS is shut down while these resources are in use. To do this, a special keyword is processed when loading *core* functionalities (from both core plugins and internal plugins with core hooks). That keyword is `cleanup`. When a core file defines the skill `cleanup`, the value will be registered internally to the AIGIS system and called on program exit. If it does not exist, no cleanup will be done outside the usual Python resource closure. Note that cleanup is expected to be a function and will be *called* on exit. Test these function thoroughly, as their failure may have serious unwanted effects.
+
+
+# Testing
+Considering AIGIS is a distributed system, testing multiple dependencies can seem rather difficult, and it is indeed a little non-standard. Since multiple core plugins could rely on each other, and setting up a simulated environment with all the path management done by AIGIS is quite a pain, the best way to test AIGIS plugins is by spinning up a test AIGIS instance, loading only the plugins needed to test.
+
+This can still be a problem when testing core plugins however. Since by design they have no interactivity, there must be at least one internal plugin in order to test the behavior of core plugins. So that there's no need to create a personalized internal plugin just for testing, AIGIS provides a default, AIGIS compliant terminal solution for loading the active AIGIS environment into any interpreter session. Simply import the `AIGISTerminal` file found in `tests`, then import `aigis`.
+
+```bash
+zaltu@mercy tests $ python3.7
+Python 3.7.3 (default, May 13 2019, 11:43:03) 
+[GCC 4.8.5 20150623 (Red Hat 4.8.5-16)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import AIGISTerminal
+>>> import aigis
+>>> aigis.backloggery.getFortuneCookie("zaltu")
+'Time to play some God of War III (PS4), my dude!'
+```
 
 
 # Example Config Files
@@ -318,20 +336,4 @@ SECRETS = {
     "ip.config": "{root}/src/db/",
     "connection_token.secret": "{root}/src/db/"
 }
-```
-
-# Testing
-Considering AIGIS is a distributed system, testing multiple dependencies can seem rather difficult, and it is indeed a little non-standard. Since multiple core plugins could rely on each other, and setting up a simulated environment with all the path management done by AIGIS is quite a pain, the best way to test AIGIS plugins is by spinning up a test AIGIS instance, loading only the plugins needed to test.
-
-This can still be a problem when testing core plugins however. Since by design they have no interactivity, there must be at least one internal plugin in order to test the behavior of core plugins. So that there's no need to create a personalized internal plugin just for testing, AIGIS provides a default, AIGIS compliant terminal solution for loading the active AIGIS environment into any interpreter session. Simply import the `AIGISTerminal` file found in `tests`, then import `aigis`.
-
-```bash
-zaltu@mercy tests $ python3.7
-Python 3.7.3 (default, May 13 2019, 11:43:03) 
-[GCC 4.8.5 20150623 (Red Hat 4.8.5-16)] on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>> import AIGISTerminal
->>> import aigis
->>> aigis.backloggery.getFortuneCookie("zaltu")
-'Time to play some God of War III (PS4), my dude!'
 ```
