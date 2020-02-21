@@ -14,8 +14,13 @@ from plugins.external.WatchDog import jiii
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 
-# Get asyncio event loop for subprocess management
+# Setup the asyncio event loop for subprocess management
 ALOOP = asyncio.get_event_loop()
+ALOOP_FOREVER = Thread(target=ALOOP.run_forever, daemon=True)
+ALOOP_FOREVER.start()
+
+# Max number of seconds to launch a plugin.
+PLUGIN_LAUNCH_TIMEOUT = 10
 
 class PluginIO():
     """
@@ -140,7 +145,7 @@ class PluginIO():
     @staticmethod
     def reload(plugin, manager):
         """
-        This plugin exposes an aigis.<module>.AIGISreload function in the aigis core module for each plugin.
+        This plugin exposes an aigis.AIGISreload function in the aigis core module.
         This allows plugins to be reloaded (and potentially updated) without needing to have the "restart"
         option selected. Since it's difficult/impossible to crash core plugins as well, this is done from
         here.
@@ -155,12 +160,13 @@ class PluginIO():
         )
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager):
         """
         Stop the plugin in as non-violent a way as possible.
-        Only implemented on process-reliant plugins, since they are the ones that need stopped.
+        Does not handle what kind of retry, if any, is attempted on burial.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: the plugin manager, for burial if needed
         """
 
 class CoreIO(PluginIO):
@@ -199,6 +205,17 @@ class CoreIO(PluginIO):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
+        plugin.reload = True
+        CoreIO.stop(plugin, manager)
+
+    @staticmethod
+    def stop(plugin, manager):
+        """
+        Unregister the skills of the core plugin and tell the manager to bury it.
+
+        :param AigisPlugin plugin: plugin to stop
+        :param PluginManager manager: manager singleton for burial
+        """
         import aigis as core_skills # AigisCore.skills
         core_skills._AIGISforgetskill(
             mod_utils.import_from_path(
@@ -206,7 +223,7 @@ class CoreIO(PluginIO):
             ),
             plugin
         )
-        plugin.log.boot("Skills deregistered.")
+        plugin.log.shutdown("Skills deregistered.")
         manager.bury(plugin)
 
 
@@ -233,11 +250,13 @@ class InternalLocalIO(PluginIO):
         Internal-local implementation of run.
         Spawns a subprocess and instanciates that python environment to include the core_skills singleton to
         expose all the core functionality in the subprocess. Also maintains a watchdog thread that monitors
-        for the process to exit. The stdout/err of the subprocess is NOT captured, but an AIGIS logging
-        object is passed to the subprocess environment for use.
+        for the process to exit. The stdout/err of the subprocess is captured and piped to the plugin's log's
+        filehandler.
 
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
+
+        :raises PluginLaunchTimeoutError: if plugin fails to launch within the timeout value
         """
         core_file = _prep_core_injector_file(plugin)
         if core_file:
@@ -251,9 +270,10 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        ALOOP.run_until_complete(InternalLocalIO._run_internal(plugin))  # TODO this is completely busted
+        tmp_loop = asyncio.new_event_loop()
+        tmp_loop.run_until_complete(InternalLocalIO._run_internal(plugin))
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager, tmp_loop), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -266,6 +286,7 @@ class InternalLocalIO(PluginIO):
 
         :raises AttributeError: if the plugin has no internal process attached to it
         """
+        plugin.reload = True
         try:
             plugin._ext_proc.kill()
         except AttributeError as e:
@@ -291,11 +312,13 @@ class InternalLocalIO(PluginIO):
         )
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager=None):
         """
         Stop the plugin in as non-violent a way as possible.
+        Killing the plugin will automatically cause the manager to bury it, so no need to do so manually.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: unused, but required by parent
         """
         _stop(plugin)
 
@@ -322,9 +345,9 @@ class ExternalIO(PluginIO):
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
         """
-        ALOOP.run_until_complete(ExternalIO._run_external(plugin))
+        ALOOP.run_until_complete(ExternalIO._run_external(plugin))  # TODO busted
         plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager), daemon=True).start()
+        Thread(target=_threaded_async_process_wait, args=(plugin, manager, ALOOP), daemon=True).start()
 
     @staticmethod
     def reload(plugin, manager):
@@ -354,11 +377,13 @@ class ExternalIO(PluginIO):
                                                                 cwd=plugin.config.ENTRYPOINT)
 
     @staticmethod
-    def stop(plugin):
+    def stop(plugin, manager=None):
         """
         Stop the plugin in as non-violent a way as possible.
+        Killing the plugin will automatically cause the manager to bury it, so no need to do so manually.
 
         :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: unused, but required by parent
         """
         _stop(plugin)
 
@@ -383,20 +408,21 @@ def _stop(plugin):
     while plugin._ext_proc.returncode is None and time.time()-start > 5:
         time.sleep(0.01)
 
-    if plugin._ext_proc is None:
+    if plugin._ext_proc.returncode is None:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
 
 
-def _threaded_async_process_wait(plugin, manager):
+def _threaded_async_process_wait(plugin, manager, loop):
     """
     Launch the Watchdog for this plugin's process.
     Can only be called on an external plugin.
 
     :param AigisPlugin plugin: the external plugin to wait for.
     :param PluginManager manager: this instance's PluginManager
+    :param AbstractEventLoop loop: the tmp generated event loop to run the watcher in
     """
-    ALOOP.run_until_complete(jiii(plugin, manager))
+    loop.run_until_complete(jiii(plugin, manager))
 
 
 def _prep_core_injector_file(plugin):
@@ -439,4 +465,9 @@ class MissingSecretFileError(exc_utils.PluginLoadError):
 class InvalidPluginTypeError(exc_utils.PluginLoadError):
     """
     Error when plugin config has an unsupported type or is not configured for it's type.
+    """
+
+class PluginLaunchTimeoutError(exc_utils.PluginLoadError):
+    """
+    Error for when the plugin is taking too long to launch.
     """

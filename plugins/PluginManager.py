@@ -53,10 +53,13 @@ class PluginManager(list):
             return
 
         if plugin in self:
-            safe_cleanup(plugin)
             self.dead.append(self.pop(self.index(plugin)))
+            self._safe_cleanup(plugin)
             plugin.log.shutdown("Plugin shut down.")
             LOG.warning("%s has terminated.", plugin.name)
+        elif plugin in self.dead:
+            # Plugin is already dead
+            pass
         else:
             LOG.warning("Plugin %s in an unexpected state, but not blocking.", plugin.name)
 
@@ -66,7 +69,7 @@ class PluginManager(list):
         """
         LOG.shutdown("Requesting plugins clean themselves up.")
         for plugin in self:
-            safe_cleanup(plugin)
+            self._safe_cleanup(plugin)
 
     def _load_one(self, plugin_name, log_manager, plugin_url):
         """
@@ -114,8 +117,30 @@ class PluginManager(list):
                 plugin.log.shutdown("Unknown error occurred launching plugin:\n%s", traceback.format_exc())
             self.pop(self.index(plugin))
             self.dead.append(plugin)
-            safe_cleanup(plugin)
+            self._safe_cleanup(plugin)
             raise
+
+    def _safe_cleanup(self, plugin):
+        """
+        Clean up a plugin in a safe way by catching errors.
+        Still log those errors as they are though. This is just so AIGIS doesn't crash, since that would be
+        very bad.
+
+        :param AigisPlugin plugin: plugin to clean up
+        """
+        # Make sure the plugin doesn't accitendally try and restart
+        plugin.restart = 0
+        plugin.reload = False
+
+        # Try and run the plugin's cleanup function. Skipped if error.
+        try:
+            plugin.cleanup()
+            # Don't bother deregistering all the core plugins, they'll die with the main process.
+            if plugin.type != "core":
+                plugin.loader.stop(plugin, self)
+        except:  #pylint: disable=bare-except
+            LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
+
 
 
 def download_plugin(plugin, source_path, plugin_path):
@@ -192,24 +217,3 @@ def _download(url, plugin_path):
     :param str plugin_path: path to download to
     """
     pygit2.clone_repository(url, plugin_path, checkout_branch="master")
-
-
-def safe_cleanup(plugin):
-    """
-    Clean up a plugin in a safe way by catching errors.
-    Still log those errors as they are though. This is just so AIGIS doesn't crash, since that would be very
-    bad.
-
-    :param AigisPlugin plugin: plugin to clean up
-    """
-    # Make sure the plugin doesn't accitendally try and restart
-    plugin.restart = 0
-    plugin.reload = False
-
-    # Try and run the plugin's cleanup function. Skipped if error.
-    try:
-        plugin.cleanup()
-    except:  #pylint: disable=bare-except
-        LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
-
-    plugin.loader.stop(plugin)

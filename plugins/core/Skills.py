@@ -1,6 +1,7 @@
 """
 Container class for the singleton which holds all core plugins' modules for shared use.
 """
+#pylint: disable=invalid-name
 from utils import exc_utils  #pylint: disable=no-name-in-module
 
 
@@ -9,7 +10,26 @@ class Skills():
     The skills class is built to mock dynamic runtime inheritance based on loaded plugins.
     Only a single instance of this class should be made, and the private functions it exposes
     (_AIGISlearnskill and _AIGISrecurdict) should only be called by the core AIGIS code.
+
+    AIGISReload is intentionally exposed to allow plugins to request others to reload themselves.
+
+    :param PluginManager manager: the plugin manager singleton
     """
+    def __init__(self, manager):
+        self.__plugin_manager__ = manager
+
+    def AIGISReload(self, plugin_name):
+        """
+        Request AIGIS to reload a certain plugin.
+        If a plugin tries to self-reload, it might have a bad time.
+
+        :param str plugin_name: name of plugin to reload
+        """
+        for plugin in self.__plugin_manager__:
+            if plugin.name == plugin_name:
+                plugin.loader.reload(plugin, self.__plugin_manager__)
+                break
+
     def _AIGISlearnskill(self, mod, plugin):
         """
         Join a given dict with this class' dict, essentially extending the functionality of the class.
@@ -36,14 +56,19 @@ class Skills():
         :param module mod: module who's functionality to port
         :param AigisPlugin plugin: this AigisPlugin
         """
+        top_level_removed = []
         for name in mod.SKILLS:
             pseq = name.split(".")
+            if pseq[0] in top_level_removed:
+                plugin.log.debug("Name %s deregistered by pruning.", name)
+                continue
             try:
                 delattr(self, pseq[0])
+                top_level_removed.append(pseq[0])
             except AttributeError:
-                plugin.log.error("Attempted to deregister %s, which cannot be found in the core.", name)
+                plugin.log.error("Attempted to deregister %s, which cannot be found in the core.", pseq[0])
                 continue
-            plugin.log.warning("Deregistered %s...", name)
+            plugin.log.warning("Deregistered %s and everything downstream.", pseq[0])
 
     def _AIGISrecurdict(self, mod, pseq, i, ns, log):
         """
@@ -120,9 +145,9 @@ def decorator(f, log):
         not supporting the "log" parameter
         """
         try:
-            return f(*args, log=log, **kwargs)
+            return f(*args, logger=log, **kwargs)
         except TypeError as e:
-            if "unexpected keyword argument 'log'" in str(e):
+            if "unexpected keyword argument 'logger'" in str(e):
                 log.warning("Function %s called without AIGIS logging...", str(f))
                 return f(*args, **kwargs)
             raise

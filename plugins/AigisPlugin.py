@@ -48,11 +48,10 @@ class AigisPlugin():
         :returns: boolead equivalence
         :rtype: bool
         """
-        try:
+        if isinstance(other, AigisPlugin):
             return self.id == other.id
-        except AttributeError:
-            pass
-        return False
+        else:
+            return self.name == other
 
     def configure(self):
         """
