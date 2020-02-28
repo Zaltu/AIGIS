@@ -1,5 +1,7 @@
 # This is the default config with all features.
 # Pick and choose
+[system]
+password = "12345"
 
 [core]
 backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
