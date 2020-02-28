@@ -6,7 +6,11 @@ import os
 # Constant paths
 # Plugins
 PLUGIN_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../ext"))
+REMOTE_PLUGIN_ROOT_PATH = DEFAULT_REMOTE_ROOT = "./sam_test/remote/"
 SECRET_DUMP = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), "../"), "secrets"))
+# Proxinator
+PROXI_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../proxinator/injector/aigis.py"))
+REMOTE_PROXI_PATH = "./sam_test/remote/_AIGISProxy/aigis.py"
 # Logging
 LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log"))
 PLUGIN_LOG_LOCATION = os.path.abspath(os.path.join(os.path.dirname(__file__), "../log/plugins/"))
