@@ -7,6 +7,7 @@ import toml
 
 from plugins.PluginManager import PluginManager
 from plugins.core.Skills import Skills
+from plugins.remote.SSHManager import SSHClient
 from diary.LogManager import LogManager
 from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 
@@ -28,6 +29,9 @@ class Aigis():
         # Load the config
         LOG.boot("Loading config...")
         self.config = toml.load(config)
+
+        # Set the "aigis" user password for this env.
+        SSHClient.user_password = self.config["system"]["password"]
 
         # Launch the logging manager
         LOG.boot("Launching global logging service...")
