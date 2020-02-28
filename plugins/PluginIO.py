@@ -21,8 +21,6 @@ ALOOP = asyncio.get_event_loop()
 ALOOP_FOREVER = Thread(target=ALOOP.run_forever, daemon=True)
 ALOOP_FOREVER.start()
 
-# Max number of seconds to launch a plugin.
-PLUGIN_LAUNCH_TIMEOUT = 10
 
 class PluginIO():
     """
