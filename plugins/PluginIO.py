@@ -8,8 +8,10 @@ import shutil
 import asyncio
 import subprocess
 from threading import Thread
+
 from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.external.WatchDog import jiii
+from plugins.remote.SSHManager import RemoteErrException
 
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
@@ -100,7 +102,7 @@ class PluginIO():
     def copy_secrets(plugin):
         """
         Copy any potential secrets a plugin could have from the AIGIS secret dump to the specified location.
-        Will not copy anything is a file is missing.
+        Will not copy anything if a file is missing.
 
         :param AigisPlugin plugin: plugin registered in core
 
@@ -169,6 +171,7 @@ class PluginIO():
         :param PluginManager manager: the plugin manager, for burial if needed
         """
 
+
 class CoreIO(PluginIO):
     """
     Plugin loader for the CORE plugin type.
@@ -231,7 +234,6 @@ class InternalLocalIO(PluginIO):
     """
     Plugin loader for the INTERNAL-LOCAL plugin type.
     """
-    ProxyPath = os.path.abspath(os.path.join(os.path.dirname(__file__), "../proxinator/injector/aigis.py"))
     @staticmethod
     def contextualize(plugin):
         """
@@ -255,8 +257,6 @@ class InternalLocalIO(PluginIO):
 
         :param AigisPlugin plugin: the plugin
         :param PluginManager manager: the plugin manager singleton
-
-        :raises PluginLaunchTimeoutError: if plugin fails to launch within the timeout value
         """
         core_file = _prep_core_injector_file(plugin)
         if core_file:
@@ -303,7 +303,7 @@ class InternalLocalIO(PluginIO):
         plugin._ext_proc = await asyncio.create_subprocess_exec(
             *[
                 sys.executable,
-                InternalLocalIO.ProxyPath,
+                path_utils.PROXI_PATH,
                 "--ENTRYPOINT", plugin.config.ENTRYPOINT,
                 "--LAUNCH", plugin.config.LAUNCH
             ],
@@ -327,7 +327,131 @@ class InternalRemoteIO(PluginIO):
     """
     Launch an internal plugin on a remote host
     """
-    # TODO
+    @staticmethod
+    def contextualize(plugin):
+        """
+        Internal-remote plugins format all roots as the remote root, since that will be the runtime
+        environemnt.
+
+        :param AigisPlugin plugin: the plugin
+        """
+        plugin._ssh.connect(plugin.config.HOST)
+        plugin._ssh.send_path(plugin.root, plugin._remote_root)
+        # roots need to be the remote root.
+        plugin.config.ENTRYPOINT = plugin.config.ENTRYPOINT.format(root=plugin._remote_root)
+        plugin.config.REQUIREMENT_FILE = plugin.config.REQUIREMENT_FILE.format(root=plugin._remote_root)
+        for secret in plugin.config.SECRETS:
+            plugin.config.SECRETS[secret] = plugin.config.SECRETS[secret].format(root=plugin._remote_root)
+        # launch is only a path on internal plugins
+        plugin.config.LAUNCH = plugin.config.LAUNCH.format(root=plugin._remote_root)
+
+    @staticmethod
+    def requirements(plugin):
+        """
+        Install the requirements for this plugin on the remote host, based on the plugin config.
+
+        :param AigisPlugin plugin: the plugin stored in core
+
+        :raises RequirementError: if requirements are not or cannot be met.
+        """
+        # Check system requirements
+        for req in plugin.config.SYSTEM_REQUIREMENTS:
+            try:
+                # "which" prints to stderr if no program is found, all good.
+                plugin._ssh._exec("which %s" % req)
+            except RemoteErrException:
+                raise RequirementError("Fatal error. Host has no %s installed." % req)
+
+        try:
+            plugin._ssh._exec(
+                " ".join([plugin.config.REQUIREMENT_COMMAND, plugin.config.REQUIREMENT_FILE])
+            )
+        except RemoteErrException as e:
+            raise RequirementError("Requirement install exited with error code\n%s" % str(e))
+        except Exception as e:
+            raise RequirementError(
+                "Could not process requirements %s. The following error occured:\n%s" %
+                (plugin.config.REQUIREMENT_FILE, str(e))
+            )
+
+        plugin.log.boot("Requirements processed successfully...")
+
+    @staticmethod
+    def copy_secrets(plugin):
+        """
+        Copy any potential secrets a plugin could have from the AIGIS secret dump to the specified remote
+        location.
+        Will not copy anything if a file is missing.
+
+        :param AigisPlugin plugin: plugin registered in core
+
+        :raises MissingSecretFileError: if a specified secret cannot be found.
+        """
+        missing_secrets = []
+        for secret in plugin.config.SECRETS:
+            if not os.path.exists(os.path.join(path_utils.SECRET_DUMP, os.path.join(plugin.name, secret))):
+                missing_secrets.append(os.path.join(
+                    path_utils.SECRET_DUMP,
+                    os.path.join(plugin.name, secret)
+                ))
+        if not missing_secrets:
+            for secret in plugin.config.SECRETS:
+                plugin._ssh.ensure_remote_path_exists(plugin.config.SECRETS[secret])
+                plugin._ssh.send_path(
+                    os.path.join(
+                        path_utils.SECRET_DUMP,
+                        os.path.join(plugin.name, secret)
+                    ),
+                    plugin.config.SECRETS[secret]
+                )
+        else:
+            raise MissingSecretFileError(
+                "The following secret files are missing:\n" + "\n".join(missing_secrets)
+            )
+
+    @staticmethod
+    def run(plugin, manager):
+        """
+        Internal-remote implementation of run.
+        This needs to:
+        - Copy proxinator to remote host,
+        - Copy plugin files to remote host,
+        - Launch
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+        """
+        plugin._ssh.ensure_proxinator()
+        plugin._ssh._exec(
+            "python3.7 {PROXIPATH} --ENTRYPOINT {ENTRYPOINT} --LAUNCH {LAUNCH}".format(
+                PROXIPATH=path_utils.REMOTE_PROXI_PATH,
+                ENTRYPOINT=plugin.config.ENTRYPOINT,
+                LAUNCH=plugin.config.LAUNCH
+            )
+        )
+
+    @staticmethod
+    def reload(plugin, manager):
+        """
+        Reload an internal plugin.
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+
+        :raises AttributeError: if the plugin has no internal process attached to it
+        """
+        PluginIO.reload(plugin, manager)
+
+    @staticmethod
+    def stop(plugin, manager=None):
+        """
+        Stop the plugin in as non-violent a way as possible.
+
+        :param AigisPlugin plugin: the plugin to stop
+        :param PluginManager manager: unused, but required by parent
+        """
+        plugin._ssh.close()
+        PluginIO.stop(plugin, manager)
 
 
 class ExternalIO(PluginIO):
@@ -465,9 +589,4 @@ class MissingSecretFileError(exc_utils.PluginLoadError):
 class InvalidPluginTypeError(exc_utils.PluginLoadError):
     """
     Error when plugin config has an unsupported type or is not configured for it's type.
-    """
-
-class PluginLaunchTimeoutError(exc_utils.PluginLoadError):
-    """
-    Error for when the plugin is taking too long to launch.
     """
