@@ -9,7 +9,6 @@ from utils.log_utils import LOG  #pylint: disable=no-name-in-module
 from utils.exc_utils import PluginLoadError  #pylint: disable=no-name-in-module
 
 PORT = 22
-AIGIS_USER = "swaugh"
 
 CHECK_PROXINATOR_CMD = f"test -f {path_utils.REMOTE_PROXI_PATH} && echo \"true\""
 
@@ -21,6 +20,7 @@ class SSHClient:
 
     Connections are made using the user "aigis", and a password set in the aigis config file.
     """
+    user_login = None
     user_password = None
     def __init__(self):
         self.client = None
@@ -39,7 +39,7 @@ class SSHClient:
         self.client.connect(
             hostname=host,
             port=PORT,
-            username=AIGIS_USER,
+            username=SSHClient.user_login,
             password=SSHClient.user_password,
             look_for_keys=False,
             allow_agent=False

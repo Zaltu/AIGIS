@@ -30,7 +30,8 @@ class Aigis():
         LOG.boot("Loading config...")
         self.config = toml.load(config)
 
-        # Set the "aigis" user password for this env.
+        # Set the "aigis" user & password for this env.
+        SSHClient.user_login = self.config["system"]["login"]
         SSHClient.user_password = self.config["system"]["password"]
 
         # Launch the logging manager
