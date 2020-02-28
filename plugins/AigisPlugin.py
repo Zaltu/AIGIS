@@ -5,11 +5,12 @@ import os
 
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
 from plugins import PluginIO
+from plugins.remote.SSHManager import SSHClient
 
 _LOADER_TYPES = {
     "core": PluginIO.CoreIO,
     "internal": PluginIO.InternalLocalIO,
-    "internal-remote": PluginIO.InternalLocalIO,
+    "internal-remote": PluginIO.InternalRemoteIO,
     "external": PluginIO.ExternalIO,
     "default": PluginIO.PluginIO  # Planned error
 }
@@ -36,6 +37,8 @@ class AigisPlugin():
         self.config = config
         self.loader = loader
         self.log = log_manager.hook(self)
+        self._ssh = None  # For internal-remote plugins. Handlered internally.
+        self._remote_root = None  # For internal-remote plugins. Handlered internally.
         self.log.boot("Registered plugin...")
 
     def __eq__(self, other):
@@ -50,8 +53,7 @@ class AigisPlugin():
         """
         if isinstance(other, AigisPlugin):
             return self.id == other.id
-        else:
-            return self.name == other
+        return self.name == other
 
     def configure(self):
         """
@@ -73,8 +75,12 @@ class AigisPlugin():
         self.restart = getattr(self.config, "RESTART", 0)
         if not hasattr(self.config, "SECRETS"):
             setattr(self.config, "SECRETS", {})
-        if self.type == "internal" and hasattr(self.config, "HOST"):
+        if self.type == "internal" and\
+           hasattr(self.config, "HOST") and\
+           self.config.HOST not in ["localhost", "127.0.0.1"]:
             self.type = "internal-remote"
+            self._remote_root = os.path.join(path_utils.REMOTE_PLUGIN_ROOT_PATH, self.name)
+            self._ssh = SSHClient()
         self.loader = _LOADER_TYPES.get(self.type, _LOADER_TYPES.get("default"))
 
     def cleanup(self):
