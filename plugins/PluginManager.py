@@ -6,7 +6,7 @@ import shutil
 import traceback
 import subprocess
 
-import pygit2
+from pygitcmd.cmdgit import GitRepo
 
 from utils import path_utils, exc_utils  #pylint: disable=no-name-in-module
 from plugins.AigisPlugin import AigisPlugin
@@ -216,4 +216,6 @@ def _download(url, plugin_path):
     :param str url: the github url to download ("account/repo-name")
     :param str plugin_path: path to download to
     """
-    pygit2.clone_repository(url, plugin_path, checkout_branch="master")
+    gr = GitRepo(plugin_path, url)
+    gr.clone()
+    gr.checkout("master")
