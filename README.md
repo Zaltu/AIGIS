@@ -59,8 +59,8 @@ AIGIS is tested under __*Python 3.7.3*__ on __*Linux/Fedora*__ and __*Linux/Ubun
 Compatibility with Windows is technically possible, however there are many tweaks to make to get it working and it is not a priority. This is unlikely to ever change unless Bill gets his shit together and makes a decent OS.
 
 AIGIS requires the following pip packages, as defined in `requirements.txt`:
-- `toml` >= 0.10.0
-- `pygit2` == 0.28.*
+- `toml`
+- `zaltu/pygitcmd` == github.com/zaltu/pygitcmd
 - `zaltu/dill` == github.com/zaltu/dill
 - `multiprocess` == 0.*
 
