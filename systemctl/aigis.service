@@ -1,0 +1,13 @@
+[Unit]
+Description=AIGIS system
+
+# Set ExecStart path to local AIGIS clone
+# kill -2 is SIGINT
+[Service]
+User=zaltu
+Type=simple
+ExecStart=/bin/python3 /home/zaltu/devenv/AIGIS/AIGIS.py
+ExecStop=/bin/kill -2 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
