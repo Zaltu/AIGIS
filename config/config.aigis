@@ -6,8 +6,10 @@ backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 dnd = "https://github.com/zaltu/dnd-utils.git"
 translate = "https://github.com/zaltu/translation-utils.git"
 genesis = "https://github.com/Zaltu/content-generator.git"
+emailtools = "https://github.com/Zaltu/email-tools.git"
 
 [internal]
 madbot = "https://github.com/zaltu/mad-bot.git"
+yns = "https://github.com/Zaltu/youtube-rss-email.git"
 
 [external]
