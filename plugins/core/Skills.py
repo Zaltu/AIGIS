@@ -1,8 +1,8 @@
 """
 Container class for the singleton which holds all core plugins' modules for shared use.
 """
-#pylint: disable=invalid-name
-from utils import exc_utils  #pylint: disable=no-name-in-module
+#pylint: disable=invalid-name,import-error
+from utils import exc_utils
 
 
 class Skills():
