@@ -1,6 +1,7 @@
 """
 Process AIGIS plugin.
 """
+#pylint: disable=import-error
 import os
 import sys
 import time
@@ -8,7 +9,7 @@ import shutil
 import asyncio
 import subprocess
 from threading import Thread
-from utils import path_utils, mod_utils, exc_utils  #pylint: disable=no-name-in-module
+from utils import path_utils, mod_utils, exc_utils
 from plugins.external.WatchDog import jiii
 
 # Set the dump location for plugin secrets
@@ -60,6 +61,7 @@ class PluginIO():
         :param AigisPlugin plugin: the plugin stored in core
         """
         plugin.config.ENTRYPOINT = plugin.config.ENTRYPOINT.format(root=plugin.root)
+        #if hasattr(plugin.config, "REQUIREMENT_FILE"):  # Requirements are not mandatory
         plugin.config.REQUIREMENT_FILE = plugin.config.REQUIREMENT_FILE.format(root=plugin.root)
         for secret in plugin.config.SECRETS:
             plugin.config.SECRETS[secret] = plugin.config.SECRETS[secret].format(root=plugin.root)
@@ -88,6 +90,8 @@ class PluginIO():
             )
         except subprocess.CalledProcessError as e:
             raise RequirementError("Requirement install exited with error code %s" % str(e))
+        except AttributeError:
+            plugin.log.warning("No requirements provided, attempting to start plugin regardless.")
         except Exception as e:
             raise RequirementError(
                 "Could not process requirements %s. The following error occured:\n%s" %
@@ -266,7 +270,7 @@ class InternalLocalIO(PluginIO):
             import aigis
             aigis._AIGISlearnskill(
                 mod_utils.import_from_path(core_file),
-                plugin.log
+                plugin
             )
             plugin.log.boot("Internal plugin registered skills...")
 
@@ -396,7 +400,7 @@ def _stop(plugin):
     :param AigisPlugin plugin: the plugin to stop
     """
     try:
-        asyncio.ensure_future(plugin._ext_proc.terminate())
+        plugin._ext_proc.terminate()
     except ProcessLookupError:
         # Process already dead. Probably exited earlier.
         return
