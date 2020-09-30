@@ -1,6 +1,7 @@
 """
 Representation of a plugin with handlers used by the core to properly route traffic.
 """
+#pylint: disable=import-error
 import os
 
 from utils import mod_utils, path_utils  #pylint: disable=no-name-in-module
@@ -76,6 +77,14 @@ class AigisPlugin():
         if self.type == "internal" and hasattr(self.config, "HOST"):
             self.type = "internal-remote"
         self.loader = _LOADER_TYPES.get(self.type, _LOADER_TYPES.get("default"))
+        # Kind of ugly. Need way for requirements to be optional. Would be easy with inheritance but
+        # we don't have that with the way configs are set up...
+        if not hasattr(self.config, "REQUIREMENT_FILE"):
+            self.config.REQUIREMENT_FILE = ""
+        if not hasattr(self.config, "REQUIREMENT_COMMAND"):
+            self.config.REQUIREMENT_COMMAND = []
+        if not hasattr(self.config, "SYSTEM_REQUIREMENTS"):
+            self.config.SYSTEM_REQUIREMENTS = []
 
     def cleanup(self):
         """
