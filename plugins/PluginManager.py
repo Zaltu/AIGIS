@@ -1,6 +1,7 @@
 """
 Helper module to hold and organize loaded plugins.
 """
+#pylint: disable=import-error
 import os
 import shutil
 import traceback
@@ -139,7 +140,7 @@ class PluginManager(list):
             if plugin.type != "core":
                 plugin.loader.stop(plugin, self)
         except:  #pylint: disable=bare-except
-            LOG.ERROR("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
+            LOG.error("PROBLEM CLEANING UP %s, CLEANUP SKIPPED! CHECK YOUR RESOURCES.", plugin.name)
 
 
 
