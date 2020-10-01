@@ -10,6 +10,6 @@ emailtools = "https://github.com/Zaltu/email-tools.git"
 
 [internal]
 madbot = "https://github.com/zaltu/mad-bot.git"
-yns = "https://github.com/Zaltu/youtube-rss-email.git"
+yns = "https://github.com/zaltu/youtube-rss-email.git"
 
 [external]
