@@ -12,5 +12,6 @@ boorunator = "https://github.com/Zaltu/boorunator.git"
 [internal]
 madbot = "https://github.com/zaltu/mad-bot.git"
 yns = "https://github.com/zaltu/youtube-rss-email.git"
+archiveserver = "https://github.com/Zaltu/archib-backend.git"
 
 [external]
