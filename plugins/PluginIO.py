@@ -12,11 +12,15 @@ from threading import Thread
 from utils import path_utils, mod_utils, exc_utils
 from plugins.external.WatchDog import jiii
 
+import nest_asyncio
+
+nest_asyncio.apply()
+
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
 
 # Setup the asyncio event loop for subprocess management
-ALOOP = asyncio.get_event_loop()
+ALOOP = asyncio.new_event_loop()
 ALOOP_FOREVER = Thread(target=ALOOP.run_forever, daemon=True)
 ALOOP_FOREVER.start()
 
@@ -275,7 +279,7 @@ class InternalLocalIO(PluginIO):
             plugin.log.boot("Internal plugin registered skills...")
 
         tmp_loop = asyncio.new_event_loop()
-        tmp_loop.run_until_complete(InternalLocalIO._run_internal(plugin))
+        tmp_loop.run_until_complete(InternalLocalIO._run_internal(plugin))  # Enabled by nest_asyncio
         plugin.log.boot("Running...")
         Thread(target=_threaded_async_process_wait, args=(plugin, manager, tmp_loop), daemon=True).start()
 

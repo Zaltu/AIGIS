@@ -2,3 +2,4 @@ toml
 git+https://github.com/Zaltu/pygitcmd.git
 git+https://github.com/Zaltu/dill.git
 multiprocess==0.70.9
+nest_asyncio
