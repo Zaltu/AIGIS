@@ -6,12 +6,12 @@ backdoorgery =  "https://github.com/zaltu/backdoorgery.git"
 dnd = "https://github.com/zaltu/dnd-utils.git"
 translate = "https://github.com/zaltu/translation-utils.git"
 genesis = "https://github.com/Zaltu/content-generator.git"
-emailtools = "https://github.com/Zaltu/email-tools.git"
+#emailtools = "https://github.com/Zaltu/email-tools.git"
 boorunator = "https://github.com/Zaltu/boorunator.git"
 
 [internal]
 madbot = "https://github.com/zaltu/mad-bot.git"
-yns = "https://github.com/zaltu/youtube-rss-email.git"
+#yns = "https://github.com/zaltu/youtube-rss-email.git"
 archiveserver = "https://github.com/Zaltu/archib-backend.git"
 
 [external]
