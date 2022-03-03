@@ -128,7 +128,7 @@ MAX_NAME_LENGTH = aigis.my_database.MAX_NAME_LENGTH()
 If the core function you are calling returns an object that cannot be serialized, an error will be raised. Thanks to the amazing work done by the `dill` and `multiprocess` packages, almost all Python objects, including classes, functions, lambdas and more are all serializable. According to the `dill` documentation, the only types not supported for serialization are [frame, generator and traceback](https://github.com/uqfoundation/dill).
 
 ### **Important Notes Concerning Internal-Core Plugin Interaction**
-Since it's not necessarily obvious, this section simply servers to shed some light on what can and can't be done when sharing data and functionality accross plugins.
+Since it's not necessarily obvious, this section simply serves to shed some light on what can and can't be done when sharing data and functionality accross plugins.
 
 There are two parts to take into account. First of all what functionality can be *exposed*? The simple answer is everything. Any possible functionality, including code related to frames, generators and tracebacks mentioned above, can be called accross process. AIGIS does some magic behind the scenes to make sure that any call made from another process ends up being evaluated *in the core process*. Since core plugins are loaded directly into the core process, this means they are run in a very standard manner, having access to the full scope of their runtimes.
 
