@@ -275,14 +275,19 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        try:
-            asyncio.get_running_loop()
-            asyncio.run_coroutine_threadsafe(InternalLocalIO._run_internal(plugin, manager, False), ALOOP)
-        except RuntimeError:  # No running event loop (first boot)
-            fut = asyncio.run_coroutine_threadsafe(InternalLocalIO._run_internal(plugin, manager, True), ALOOP)
-            fut.result()  # Block
-            asyncio.run_coroutine_threadsafe(jiii(plugin, manager), ALOOP)
+        asyncio.run_coroutine_threadsafe(InternalLocalIO._async_process_start(plugin, manager), ALOOP)
 
+    @staticmethod
+    async def _async_process_start(plugin, manager):
+        """
+        Start the internal plugin subprocess, and schedule its callback using _async_process_wait.
+        THIS FUNCTION MUST BE CALLED IN THE THREAD PROCESSING THE EVENT LOOP.
+
+        :param AigisPlugin plugin: the plugin
+        :param PluginManager manager: the plugin manager singleton
+        """
+        fut = asyncio.create_task(InternalLocalIO._run_internal(plugin, manager))
+        asyncio.create_task(_async_process_wait(fut, plugin, manager))
 
     @staticmethod
     def reload(plugin, manager):
@@ -299,7 +304,7 @@ class InternalLocalIO(PluginIO):
         InternalLocalIO.stop(plugin)
 
     @staticmethod
-    async def _run_internal(plugin, manager, isfirst):
+    async def _run_internal(plugin, manager):
         """
         Launch an asyncio subprocess.
 
@@ -316,9 +321,6 @@ class InternalLocalIO(PluginIO):
             stderr=plugin.log.filehandler
         )
         plugin.log.boot("Running...")
-        if not isfirst:
-            asyncio.run_coroutine_threadsafe(jiii(plugin, manager), ALOOP)
-
 
     @staticmethod
     def stop(plugin, manager=None):
@@ -420,6 +422,21 @@ def _stop(plugin):
     if plugin._ext_proc.returncode is None:
         plugin.log.warning("Plugin taking too long to terminate, killing it.")
         plugin._ext_proc.kill()
+
+
+async def _async_process_wait(fut, plugin, manager):
+    """
+    Wait for the subprocess creation Future, then launch the
+    Watchdog for this plugin's process. Can only be called on
+    an internal or external plugin.
+    THIS FUNCTION MUST BE CALLED IN THE THREAD PROCESSING THE EVENT LOOP.
+
+    :param asyncio.Future fut: the subprocess creation Future.
+    :param AigisPlugin plugin: the external plugin to wait for.
+    :param PluginManager manager: this instance's PluginManager
+    """
+    await fut
+    asyncio.create_task(jiii(plugin, manager))
 
 
 def _threaded_async_process_wait(plugin, manager):
