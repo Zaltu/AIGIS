@@ -12,9 +12,6 @@ from threading import Thread
 from utils import path_utils, mod_utils, exc_utils
 from plugins.external.WatchDog import jiii
 
-import nest_asyncio
-
-nest_asyncio.apply()
 
 # Set the dump location for plugin secrets
 path_utils.ensure_path_exists(path_utils.SECRET_DUMP)
@@ -278,10 +275,14 @@ class InternalLocalIO(PluginIO):
             )
             plugin.log.boot("Internal plugin registered skills...")
 
-        tmp_loop = asyncio.new_event_loop()
-        tmp_loop.run_until_complete(InternalLocalIO._run_internal(plugin))  # Enabled by nest_asyncio
-        plugin.log.boot("Running...")
-        Thread(target=_threaded_async_process_wait, args=(plugin, manager, tmp_loop), daemon=True).start()
+        try:
+            asyncio.get_running_loop()
+            asyncio.run_coroutine_threadsafe(InternalLocalIO._run_internal(plugin, manager, False), ALOOP)
+        except RuntimeError:  # No running event loop (first boot)
+            fut = asyncio.run_coroutine_threadsafe(InternalLocalIO._run_internal(plugin, manager, True), ALOOP)
+            fut.result()  # Block
+            asyncio.run_coroutine_threadsafe(jiii(plugin, manager), ALOOP)
+
 
     @staticmethod
     def reload(plugin, manager):
@@ -295,14 +296,10 @@ class InternalLocalIO(PluginIO):
         :raises AttributeError: if the plugin has no internal process attached to it
         """
         plugin.reload = True
-        try:
-            plugin._ext_proc.kill()
-        except AttributeError as e:
-            raise AttributeError("Missing internal process for plugin %s. A reload request was made when the"
-                                 "plugin wasn't active.") from e
+        InternalLocalIO.stop(plugin)
 
     @staticmethod
-    async def _run_internal(plugin):
+    async def _run_internal(plugin, manager, isfirst):
         """
         Launch an asyncio subprocess.
 
@@ -318,6 +315,10 @@ class InternalLocalIO(PluginIO):
             stdout=plugin.log.filehandler,
             stderr=plugin.log.filehandler
         )
+        plugin.log.boot("Running...")
+        if not isfirst:
+            asyncio.run_coroutine_threadsafe(jiii(plugin, manager), ALOOP)
+
 
     @staticmethod
     def stop(plugin, manager=None):
@@ -413,7 +414,7 @@ def _stop(plugin):
     # Keep checking for return code on process. We can't wait for it because it wouldn't block the process
     # and then the task may not finish.
     start = time.time()
-    while plugin._ext_proc.returncode is None and time.time()-start > 5:
+    while plugin._ext_proc.returncode is None and time.time()-start < 5:
         time.sleep(0.01)
 
     if plugin._ext_proc.returncode is None:
@@ -421,7 +422,7 @@ def _stop(plugin):
         plugin._ext_proc.kill()
 
 
-def _threaded_async_process_wait(plugin, manager, loop):
+def _threaded_async_process_wait(plugin, manager):
     """
     Launch the Watchdog for this plugin's process.
     Can only be called on an external plugin.
@@ -430,7 +431,7 @@ def _threaded_async_process_wait(plugin, manager, loop):
     :param PluginManager manager: this instance's PluginManager
     :param AbstractEventLoop loop: the tmp generated event loop to run the watcher in
     """
-    loop.run_until_complete(jiii(plugin, manager))
+    asyncio.run_coroutine_threadsafe(jiii(plugin, manager), loop=ALOOP)
 
 
 def _prep_core_injector_file(plugin):
