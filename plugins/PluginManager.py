@@ -46,10 +46,12 @@ class PluginManager(list):
             if plugin.reload:
                 plugin.log.info("Attempting to reload plugin...")
                 plugin.reload = False
+                # Since we're reloading, see if there's a new version
+                self._try_download_and_config(plugin)
             elif plugin.restart:
                 plugin.log.info("Attempting to restart plugin...")
                 plugin.restart -= 1
-
+            # Try to launch actual plugin
             self._try_load(plugin)
             return
 
@@ -87,16 +89,36 @@ class PluginManager(list):
         :param LogManager log_manager: the AIGIS LogManager singleton for this execution
         :param str plugin_url: web URL from which to download the plugin
         """
-        plugin = AigisPlugin(plugin_name, log_manager)
+        plugin = AigisPlugin(plugin_name, log_manager, plugin_url)
+
+        # Plugin generated successfully, add to self for tracking
+        self.append(plugin)
 
         plugin.log.boot("Downloading plugin...")
-        if not download_plugin(plugin, plugin_url, plugin.root):
-            return
-
-        plugin.configure()
+        self._try_download_and_config(plugin)
 
         plugin.log.boot("Preparing to launch...")
         self._try_load(plugin)
+
+
+    def _try_download_and_config(self, plugin):
+        """
+        Attempt to safely download the plugin src from the external location and configure the AigisPlugin
+        object accordingly.
+        This function is used during initial setup and during a reload in order to attempt to capture the
+        latest version of the plugin. It is NOT called during a restart.
+
+        :param AigisPlugin plugin: the plugin to fetch and configure
+
+        :returns: if the download and configuration was successful.
+        :rtype: bool
+        """
+        if not download_plugin(plugin, plugin.src_url, plugin.root):
+            return False
+
+        # Update configuration in this case
+        plugin.configure()
+        return True
 
     def _try_load(self, plugin):
         """
@@ -110,7 +132,6 @@ class PluginManager(list):
         """
         try:
             plugin.loader.load(plugin, self)
-            self.append(plugin)
         except Exception as e:
             if isinstance(e, exc_utils.PluginLoadError):
                 plugin.log.shutdown("Could not load plugin, shutting down...")

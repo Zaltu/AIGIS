@@ -26,11 +26,12 @@ class AigisPlugin():
     :param object config: the plugin's config namespace
     :param PluginLoader.Loader loader: loader class appropriate for this plugin
     """
-    def __init__(self, name, log_manager, ptype=None, restart=0, config=None, loader=None):
+    def __init__(self, name, log_manager, src_url, ptype=None, restart=0, config=None, loader=None):
         self.id = id(self)
         self.name = name
         self.root = os.path.join(path_utils.PLUGIN_ROOT_PATH, self.name)
         self.config_path = os.path.join(self.root, "AIGIS/AIGIS.config")
+        self.src_url = src_url
         self.type = ptype
         self.restart = restart
         self.reload = False
