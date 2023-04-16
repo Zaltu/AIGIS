@@ -54,7 +54,7 @@ When providing a path to the local source of a plugin, AIGIS will *copy the prov
 <br>
 
 # Requirements
-AIGIS is tested under __*Python 3.7.3*__ on __*Linux/Fedora*__ and __*Linux/Ubuntu*__ and is compatible with all Linux and MacOS systems.
+AIGIS is tested under __*Python 3.10.6*__ on __*Linux/Ubuntu*__ and should be compatible with all Linux and MacOS systems.
 
 Compatibility with Windows is technically possible, however there are many tweaks to make to get it working and it is not a priority. This is unlikely to ever change unless Bill gets his shit together and makes a decent OS.
 
@@ -62,7 +62,7 @@ AIGIS requires the following pip packages, as defined in `requirements.txt`:
 - `toml`
 - `zaltu/pygitcmd` == github.com/zaltu/pygitcmd
 - `zaltu/dill` == github.com/zaltu/dill
-- `multiprocess` == 0.*
+- `multiprocess` == 0.70.14
 
 These are the requirements for running AIGIS on it's own. Plugins may have other requirements, both executable and through pip. Check your plugin's requirements before launching AIGIS to ensure they can be met.
 
@@ -98,7 +98,7 @@ Internal plugins represent most of the active, visible, complex "functionality" 
 
 Internal plugins are services with daemon-like attributes that can run on *any* host, *including but not limited to* the host running the AIGIS core. These can be observers, pollers, watchers, or any other variation of such implementation. Of course, they can also do other things, but the AIGIS core will not ever natively make calls to internal plugins, so without some form of external input, they will be functionaly useless.
 
-Internal plugins must be written in the same language, at this moment Python __3.7.3__. The processes handling internal plugins are always launched using the same Python interpreter as the one used to launch AIGIS (via `sys.executable`).
+Internal plugins must be written in the same language, at this moment Python __3.10.6__. The processes handling internal plugins are always launched using the same Python interpreter as the one used to launch AIGIS (via `sys.executable`).
 
 ### Configuring an Internal Plugin
 Only the central AIGIS config file is *required* in order to configure an internal plugin.
